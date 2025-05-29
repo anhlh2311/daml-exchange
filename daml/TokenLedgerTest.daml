@@ -1,0 +1,176 @@
+module TokenLedgerTest where
+
+import Daml.Script
+import Currency.TokenLedger
+import Currency.TokenMetadata
+import DA.Time
+import DA.Date
+
+-- Helper function to create sample metadata
+createSampleMetadata : Text -> Text -> TokenMetadata
+createSampleMetadata name symbol = TokenMetadata with
+  name = name
+  symbol = symbol
+  decimals = 6
+  description = "Sample token for testing purposes"
+  website = Some "https://example.com"
+  logoUrl = Some "https://example.com/logo.png"
+  category = "Test Token"
+  issuedDate = time (date 2024 Jan 1) 0 0 0
+  version = "1.0.0"
+
+testTokenLifecycle : Script ()
+testTokenLifecycle = do
+  owner <- allocateParty "TokenOwner"
+  alice <- allocateParty "Alice" 
+  bob <- allocateParty "Bob"
+  charlie <- allocateParty "Charlie"
+  
+  setupCid <- submit owner do
+    createCmd TokenSetup with
+      owner = owner
+      initialSupply = 0.0
+      metadata = createSampleMetadata "Tether USD" "USDT"
+      observers = [alice, bob, charlie]
+  
+  (masterCid, ownerTokenCid) <- submit owner do
+    exerciseCmd setupCid Initialize
+  
+  -- Owner mints tokens to themselves
+  (masterCid2, ownerTokenCid) <- submit owner do
+    exerciseCmd masterCid Mint with
+      amount = 100.0
+  
+  -- Owner creates transfer proposal for Alice
+  aliceProposalCid <- submit owner do
+    createCmd TokenTransferProposal with
+      tokenCid = ownerTokenCid
+      sender = owner
+      recipient = alice
+      amount = 90.0
+  
+  -- Alice accepts the transfer
+  aliceTokenCid <- submit alice do
+    exerciseCmd aliceProposalCid Accept
+  
+  debug "Alice received 90 tokens."
+  debug $ "Alice token contract: " <> show aliceTokenCid
+
+  -- Alice creates transfer proposal for Bob
+  
+  bobProposalCid <- submit alice do
+    createCmd TokenTransferProposal with
+      tokenCid = aliceTokenCid
+      sender = alice
+      recipient = bob
+      amount = 30.0
+  
+  -- Bob accepts the transfer
+  bobTokenCid <- submit bob do
+    exerciseCmd bobProposalCid Accept
+  
+  debug "Alice transferred 30 tokens to Bob"
+  
+  -- Owner mints more tokens and creates proposal for Charlie
+  (masterCid3, ownerTokenCid2) <- submit owner do
+    exerciseCmd masterCid2 Mint with
+      amount = 50.0
+  
+  charlieProposalCid <- submit owner do
+    createCmd TokenTransferProposal with
+      tokenCid = ownerTokenCid2
+      sender = owner
+      recipient = charlie
+      amount = 50.0
+  
+  -- charlieTokenCid <- submit charlie do
+  --   exerciseCmd charlieProposalCid Accept
+  
+  -- debug "Charlie received 50 tokens"
+  
+  -- -- Bob creates transfer proposal back to Alice
+  -- aliceProposal2Cid <- submit bob do
+  --   createCmd TokenTransferProposal with
+  --     tokenCid = bobTokenCid
+  --     sender = bob
+  --     recipient = alice
+  --     amount = 10.0
+  --     symbol = "USDT"
+  
+  -- aliceNewTokenCid <- submit alice do
+  --   exerciseCmd aliceProposal2Cid Accept
+  
+  -- debug "Bob proposed and Alice accepted a transfer of 10 tokens"
+
+  -- Query all contracts that can be seen by the Token owner
+  allTokenHolders <- query @TokenLedger owner
+  debug $ allTokenHolders
+
+  -- Query all contracts that can be seen by Alice
+  aliceTokenHolders <- query @TokenLedger alice
+  debug $ aliceTokenHolders
+  
+  return ()
+
+testErrorHandling : Script ()
+testErrorHandling = do
+  owner <- allocateParty "Owner"
+  alice <- allocateParty "Alice"
+  
+  setupCid <- submit owner do
+    createCmd TokenSetup with
+      owner = owner
+      initialSupply = 100.0
+      metadata = createSampleMetadata "Test Token" "TEST"
+      observers = [alice]
+
+  (masterCid, ownerTokenCid) <- submit owner do
+    exerciseCmd setupCid Initialize
+  
+  -- Create transfer proposal for Alice
+  aliceProposalCid <- submit owner do
+    createCmd TokenTransferProposal with
+      tokenCid = ownerTokenCid
+      sender = owner
+      recipient = alice
+      amount = 100.0
+  
+  aliceTokenCid <- submit alice do
+    exerciseCmd aliceProposalCid Accept
+  
+  -- Test error cases with Alice's tokens
+  -- Create a proposal with excessive amount (this should succeed)
+  excessiveProposalCid <- submit alice do
+    createCmd TokenTransferProposal with
+      tokenCid = aliceTokenCid
+      sender = alice
+      recipient = owner
+      amount = 150.0  -- More than available
+  
+  -- But accepting it should fail due to insufficient balance
+  submitMustFail owner do
+    exerciseCmd excessiveProposalCid Accept
+  
+  debug "Transfer proposal acceptance with excessive amount correctly failed"
+  
+  submitMustFail owner do
+    exerciseCmd masterCid Mint with
+      amount = (-50.0)
+  
+  debug "Minting negative amount correctly failed"
+  
+  return ()
+
+main : Script ()
+main = do
+  debug "Running TokenLedger tests..."
+  
+  debug "=== Testing Token Lifecycle ==="
+  testTokenLifecycle
+  
+  debug "=== Testing Error Handling ==="
+  testErrorHandling
+  
+  debug "All tests completed successfully!"
+  
+  return () 

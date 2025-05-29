@@ -1,0 +1,166 @@
+module Currency.TokenLedger where
+
+import Currency.TokenMetadata
+
+template TokenLedger
+  with
+    owner : Party
+    holder : Party
+    amount : Decimal
+    symbol : Text
+    metadata : TokenMetadata
+    observers : [Party]
+  where
+    signatory holder
+    observer owner :: observers
+
+    key (owner, holder): (Party, Party)
+    maintainer key._2
+
+    ensure amount >= 0.0
+
+    choice Transfer : ContractId TokenLedger
+      with
+        target : Party
+        transferAmount : Decimal
+      controller holder, target
+      do
+        assertMsg "Transfer amount must be positive" (transferAmount > 0.0)
+        assertMsg "Insufficient balance" (amount >= transferAmount)
+        
+        -- Full transfer
+        if transferAmount == amount
+        then do
+          create this with
+            holder = target
+            amount = transferAmount
+            observers = if target `elem` observers then observers else target :: observers
+        else do
+          -- Partial transfer
+          -- Create a new token contract for the target with the transfer amount
+          targetTokenCid <- create this with
+            holder = target
+            amount = transferAmount
+            observers = if target `elem` observers then observers else target :: observers
+          
+          -- Update the current token contract's balance
+          create this with
+            amount = amount - transferAmount
+
+          -- Return the new token contract
+          return targetTokenCid
+
+template TokenMaster
+  with
+    owner : Party
+    totalSupply : Decimal
+    metadata : TokenMetadata
+    observers : [Party]
+  where
+    signatory owner
+    observer observers
+
+    choice Mint : (ContractId TokenMaster, ContractId TokenLedger)
+      with
+        amount : Decimal
+      controller owner
+      do
+        assertMsg "Mint amount must be positive" (amount > 0.0)
+
+        -- fetch the token contract for the owner
+        tokenCid <- fetchByKey @TokenLedger (owner, owner)
+
+        -- archive the old token contract
+        archive tokenCid._1
+        
+        -- create a new token contract for the owner
+        tokenCid <- create TokenLedger with
+          owner = owner
+          holder = owner
+          amount = amount
+          symbol = metadata.symbol
+          metadata = metadata
+          observers = observers
+
+        debug $ "New token contract: " <> show tokenCid
+        debug $ "Amount: " <> show amount
+        
+        newMasterCid <- create this with
+          totalSupply = totalSupply + amount
+        
+        return (newMasterCid, tokenCid)
+
+    choice Burn : ContractId TokenMaster
+      with
+        tokenCid : ContractId TokenLedger
+      controller owner
+      do
+        token <- fetch tokenCid
+        assertMsg "Can only burn tokens of this type" (token.symbol == metadata.symbol)
+        assertMsg "Can only burn tokens owned by this master" (token.owner == owner)
+        
+        archive tokenCid
+        create this with
+          totalSupply = totalSupply - token.amount
+
+template TokenTransferProposal
+  with
+    tokenCid : ContractId TokenLedger
+    sender : Party
+    recipient : Party
+    amount : Decimal
+  where
+    signatory sender
+    observer recipient
+
+    choice Accept : ContractId TokenLedger
+      controller recipient
+      do
+        exercise tokenCid Transfer with
+          target = recipient
+          transferAmount = amount
+
+    choice Cancel : ContractId TokenLedger
+      controller sender
+      do
+        return tokenCid
+
+template TokenSetup
+  with
+    owner : Party
+    initialSupply : Decimal
+    metadata : TokenMetadata
+    observers : [Party]
+  where
+    signatory owner
+
+    choice Initialize : (ContractId TokenMaster, ContractId TokenLedger)
+      controller owner
+      do
+        assertMsg "Initial supply must be non-negative" (initialSupply >= 0.0)
+        
+        masterCid <- create TokenMaster with
+          owner = owner
+          totalSupply = initialSupply
+          metadata = metadata
+          observers = observers
+        
+        if initialSupply > 0.0
+        then do
+          tokenCid <- create TokenLedger with
+            owner = owner
+            holder = owner
+            amount = initialSupply
+            symbol = metadata.symbol
+            metadata = metadata
+            observers = observers
+          return (masterCid, tokenCid)
+        else do
+          tokenCid <- create TokenLedger with
+            owner = owner
+            holder = owner
+            amount = 0.0
+            symbol = metadata.symbol
+            metadata = metadata
+            observers = observers
+          return (masterCid, tokenCid) 
