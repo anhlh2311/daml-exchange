@@ -9,7 +9,6 @@ template TokenLedger
     amount : Decimal
     symbol : Text
     metadata : TokenMetadata
-    -- observers : [Party]  -- Only used for TokenMaster-level transparency, not balance visibility
   where
     signatory holder
     observer owner  -- Only owner can see all balances, no other observers
@@ -34,16 +33,12 @@ template TokenLedger
           create this with
             holder = target
             amount = transferAmount
-            -- observers = if target `elem` observers then observers else target :: observers
-            -- Remove general observers for privacy - only target and owner can see their balance
         else do
           -- Partial transfer
           -- Create a new token contract for the target with the transfer amount
           targetTokenCid <- create this with
             holder = target
             amount = transferAmount
-            -- observers = if target `elem` observers then observers else target :: observers
-            -- Remove general observers for privacy - only target and owner can see their balance
           
           -- Update the current token contract's balance (holder unchanged)
           create this with
@@ -148,18 +143,22 @@ template TokenMaster
         token <- fetch tokenCid
         assertMsg "Can only burn tokens of this type" (token.symbol == metadata.symbol)
         assertMsg "Can only burn tokens owned by this master" (token.owner == owner)
-        -- assertMsg "Insufficient balance" (token.amount >= fromSome amount)
 
         amount <- case amountToBurn of
+          -- If the amount to burn is provided, use it
           Some amountToBurn -> do
             assertMsg "Insufficient balance" (token.amount >= amountToBurn)
             return amountToBurn
+          
+          -- If the amount to burn is not provided, use the entire balance
           None -> do
             assertMsg "Amount must be positive" (token.amount > 0.0)
             return token.amount
 
+        -- Archive the token contract
         archive tokenCid
 
+        -- Create a new token contract for the owner with the remaining balance
         newTokenLedgerCid <- if token.amount > amount then do
           ledgerCid <- create TokenLedger with
             holder = owner
@@ -171,6 +170,7 @@ template TokenMaster
         else do
           return (None)
 
+        -- Create a new TokenMaster contract with the updated total supply
         newTokenMasterCid <- create this with
           totalSupply = totalSupply - amount
         
