@@ -195,7 +195,14 @@ testBurningAndSupply = do
   -- Query the total supply
   ownerTokenMasterScript <- query @TokenMaster owner
   let ownerTokenMasterContract = head (ownerTokenMasterScript)
-  debug $ "Total supply: " <> show ownerTokenMasterContract._2.totalSupply
+  debug $ "Total supply after burning 10 tokens: " <> show ownerTokenMasterContract._2.totalSupply
+
+  -- Owner burns excess tokens (more than his balance)
+  submitMustFail owner do 
+    exerciseCmd masterCid3 Burn with 
+      tokenCid = ownerLedgerCid4
+      amountToBurn = Some 1000.0
+  debug "Owner burned excess tokens failed as expected."
 
   -- Owner burns all of his tokens (full burn)
   let ownerLedgerCid5 = fromSome ownerLedgerCid5Opt
