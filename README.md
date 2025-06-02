@@ -43,7 +43,7 @@ Controls minting and burning of a token type, and tracks total supply.
 **Choices:**
 
 - `Mint`: Create new tokens for the owner
-- `Burn`: Destroy tokens and reduce total supply. Can burn a partial amount, returning a new TokenLedger contract for the remaining balance if any.
+- `Burn`: Destroy tokens and reduce total supply. Can burn a partial amount, returning a new TokenLedger contract for the remaining balance if any. Takes an `Optional Decimal` for the amount to burn: if `None`, burns the entire balance; if `Some amount`, burns only that amount.
 
 ### 3. TokenTransferLock
 
@@ -126,14 +126,14 @@ ownerLedgerCid5 <- submit owner do
 (masterCid3, ownerLedgerCid3Opt) <- submit owner do
   exerciseCmd masterCid2 Burn with
     tokenCid = ownerLedgerCid3
-    amount = 10.0
+    amountToBurn = Some 10.0
 -- ownerLedgerCid3Opt is Some cid if there is a remaining balance, None if fully burned
 
 -- Owner burns all remaining tokens (full burn)
 (masterCid4, ownerLedgerCid4Opt) <- submit owner do
   exerciseCmd masterCid3 Burn with
     tokenCid = fromSome ownerLedgerCid3Opt
-    amount = <remaining amount>
+    amountToBurn = None
 -- ownerLedgerCid4Opt will be None if all tokens are burned
 ```
 
