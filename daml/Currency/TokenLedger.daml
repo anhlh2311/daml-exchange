@@ -142,20 +142,28 @@ template TokenMaster
     choice Burn : (ContractId TokenMaster, Optional (ContractId TokenLedger))
       with
         tokenCid : ContractId TokenLedger
-        amountToBurn : Decimal
+        amountToBurn : Optional Decimal
       controller owner
       do
         token <- fetch tokenCid
         assertMsg "Can only burn tokens of this type" (token.symbol == metadata.symbol)
         assertMsg "Can only burn tokens owned by this master" (token.owner == owner)
-        assertMsg "Insufficient balance" (token.amount >= amountToBurn)
-        
+        -- assertMsg "Insufficient balance" (token.amount >= fromSome amount)
+
+        amount <- case amountToBurn of
+          Some amountToBurn -> do
+            assertMsg "Insufficient balance" (token.amount >= amountToBurn)
+            return amountToBurn
+          None -> do
+            assertMsg "Amount must be positive" (token.amount > 0.0)
+            return token.amount
+
         archive tokenCid
 
-        newTokenLedgerCid <- if token.amount > amountToBurn then do
+        newTokenLedgerCid <- if token.amount > amount then do
           ledgerCid <- create TokenLedger with
             holder = owner
-            amount = token.amount - amountToBurn
+            amount = token.amount - amount
             symbol = token.symbol
             ..
 
@@ -164,7 +172,7 @@ template TokenMaster
           return (None)
 
         newTokenMasterCid <- create this with
-          totalSupply = totalSupply - amountToBurn
+          totalSupply = totalSupply - amount
         
         return (newTokenMasterCid, newTokenLedgerCid)
 

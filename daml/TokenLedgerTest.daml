@@ -186,16 +186,29 @@ testBurningAndSupply = do
   debug $ "Owner token master: " <> show ownerTokenMaster
 
   -- Owner burns 10 tokens
-  _ <- submit owner do 
+  (masterCid3, ownerLedgerCid5Opt) <- submit owner do 
     exerciseCmd masterCid2 Burn with 
       tokenCid = ownerLedgerCid4
-      amount = 10.0
+      amountToBurn = Some 10.0
   debug "Owner burned 10 tokens."
 
   -- Query the total supply
   ownerTokenMasterScript <- query @TokenMaster owner
   let ownerTokenMasterContract = head (ownerTokenMasterScript)
   debug $ "Total supply: " <> show ownerTokenMasterContract._2.totalSupply
+
+  -- Owner burns all of his tokens (full burn)
+  let ownerLedgerCid5 = fromSome ownerLedgerCid5Opt
+  (masterCid4, ownerLedgerCid6Opt) <- submit owner do 
+    exerciseCmd masterCid3 Burn with 
+      tokenCid = ownerLedgerCid5
+      amountToBurn = None
+  debug "Owner burned all of his tokens."
+
+  -- Query the total supply
+  ownerTokenMasterScript <- query @TokenMaster owner
+  let ownerTokenMasterContract = head (ownerTokenMasterScript)
+  debug $ "Total supply after owner's full burn: " <> show ownerTokenMasterContract._2.totalSupply
 
   return ()
 
@@ -322,7 +335,7 @@ testErrorHandling = do
   submitMustFail alice do 
     exerciseCmd masterCid2 Burn with 
       tokenCid = ownerLedgerCid2
-      amount = 10.0
+      amountToBurn = Some 10.0
   debug "Burn by non-owner failed as expected."
 
   -- Burn: wrong token type
@@ -341,14 +354,14 @@ testErrorHandling = do
   submitMustFail owner do 
     exerciseCmd masterCid2 Burn with 
       tokenCid = ownerBtcLedgerCid
-      amount = 10.0
+      amountToBurn = Some 10.0
   debug "Burn with wrong token type failed as expected."
 
   -- Burn: valid (use latest active owner ledger)
   _ <- submit ownerBtc do 
     exerciseCmd masterBtcCid Burn with 
       tokenCid = ownerBtcLedgerCid
-      amount = 10.0
+      amountToBurn = Some 10.0
   debug "Burn by owner succeeded."
 
   debug "All error handling tests completed."
