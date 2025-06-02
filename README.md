@@ -62,6 +62,7 @@ Represents a pending transfer that must be accepted or rejected by the recipient
 - `Cancel`: Sender cancels and reclaims tokens
 
 ### 4. TokenSetup
+
 Initializes a new token type and creates the first TokenMaster and TokenLedger contracts.
 
 ## Usage Examples
