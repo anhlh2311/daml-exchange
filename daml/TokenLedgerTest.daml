@@ -1,10 +1,11 @@
 module TokenLedgerTest where
 
-import Daml.Script
+import Daml.Script hiding (trySubmit)
 import Currency.TokenLedger
 import Currency.TokenMetadata
 import DA.Time
 import DA.Date
+import DA.Optional (fromSome)
 
 -- Helper function to create sample metadata
 createSampleMetadata : Text -> Text -> TokenMetadata
@@ -13,9 +14,9 @@ createSampleMetadata name symbol = TokenMetadata with
   symbol = symbol
   decimals = 6
   description = "Sample token for testing purposes"
-  website = Some "https://example.com"
-  logoUrl = Some "https://example.com/logo.png"
-  category = "Test Token"
+  -- website = Some "https://example.com"
+  -- logoUrl = Some "https://example.com/logo.png"
+  -- category = "Test Token"
   issuedDate = time (date 2024 Jan 1) 0 0 0
   version = "1.0.0"
 
@@ -33,82 +34,96 @@ testTokenLifecycle = do
       metadata = createSampleMetadata "Tether USD" "USDT"
       observers = [alice, bob, charlie]
   
-  (masterCid, ownerTokenCid) <- submit owner do
+  (masterCid, ownerTokenLedgerCid0) <- submit owner do
     exerciseCmd setupCid Initialize
   
   -- Owner mints tokens to themselves
-  (masterCid2, ownerTokenCid) <- submit owner do
+  (masterCid2, ownerTokenLedgerCid0) <- submit owner do
     exerciseCmd masterCid Mint with
       amount = 100.0
   
-  -- Owner creates transfer proposal for Alice
-  aliceProposalCid <- submit owner do
-    createCmd TokenTransferProposal with
-      tokenCid = ownerTokenCid
-      sender = owner
+  -- Split the owner's token contract into 2 contracts:
+  --  1. 90 tokens for transfering to Alice
+  --  2. 10 tokens remain for the owner
+  -- then create a TokenTransferLock contract for the owner
+  (aliceTokenTransferLockCid, ownerTokenLedgerCid1) <- submit owner do
+    exerciseCmd ownerTokenLedgerCid0 LockTokenForTransfer with
       recipient = alice
-      amount = 90.0
+      transferAmount = 90.0
   
   -- Alice accepts the transfer
-  aliceTokenCid <- submit alice do
-    exerciseCmd aliceProposalCid Accept
+  aliceTokenLedgerCid0 <- submit alice do
+    exerciseCmd aliceTokenTransferLockCid Accept
   
   debug "Alice received 90 tokens."
-  debug $ "Alice token contract: " <> show aliceTokenCid
+  debug $"Alice token contract: " <> show aliceTokenLedgerCid0
 
-  -- Alice creates transfer proposal for Bob
-  
-  bobProposalCid <- submit alice do
-    createCmd TokenTransferProposal with
-      tokenCid = aliceTokenCid
-      sender = alice
+  -- Alice creates TokenTransferLock with 30.0 tokens for Bob
+  (bobTokenTransferLockCid, aliceRemainingLedgerOpt) <- submit alice do
+    exerciseCmd aliceTokenLedgerCid0 LockTokenForTransfer with
       recipient = bob
-      amount = 30.0
+      transferAmount = 30.0
+  let aliceTokenLedgerCid1 = fromSome aliceRemainingLedgerOpt -- Expecting Some, will fail if None
   
   -- Bob accepts the transfer
-  bobTokenCid <- submit bob do
-    exerciseCmd bobProposalCid Accept
+  bobTokenLedgerCid <- submit bob do
+    exerciseCmd bobTokenTransferLockCid Accept
   
   debug "Alice transferred 30 tokens to Bob"
   
   -- Owner mints more tokens and creates proposal for Charlie
-  (masterCid3, ownerTokenCid2) <- submit owner do
+  (masterCid3, ownerTokenLedgerCid2) <- submit owner do
     exerciseCmd masterCid2 Mint with
-      amount = 50.0
+      amount = 100.0
   
-  charlieProposalCid <- submit owner do
-    createCmd TokenTransferProposal with
-      tokenCid = ownerTokenCid2
-      sender = owner
+  (charlieTokenTransferLockCid, ownerTokenLedgerCid2) <- submit owner do
+    exerciseCmd ownerTokenLedgerCid2 LockTokenForTransfer with
       recipient = charlie
-      amount = 50.0
+      transferAmount = 20.0
+
+  -- Charlie rejects the transfer
+  charlieRejectedTokenCid <- submit charlie do
+    exerciseCmd charlieTokenTransferLockCid Reject
+
+  -- TokenOwner accepts the TokenTransferLock created by Charlie's rejection
+  ownerTokenLedgerCid3 <- submit owner do
+    exerciseCmd charlieRejectedTokenCid Accept
+
+  debug "Charlie rejected the transfer"
+  debug $ "Charlie rejected token contract: " <> show charlieRejectedTokenCid
+  debug $ "TokenOwner token ledger contract: " <> show ownerTokenLedgerCid3
+  debug $ "TokenOwner reclaimed 20 tokens"
   
-  -- charlieTokenCid <- submit charlie do
-  --   exerciseCmd charlieProposalCid Accept
+  -- Alice creates a TokenTransferLock with 10.0 tokens for Charlie
+  (charlieTokenTransferLockCid2, aliceRemainingLedger2Opt) <- submit alice do
+    exerciseCmd aliceTokenLedgerCid1 LockTokenForTransfer with -- Uses aliceTokenLedgerCid1 from previous step
+      recipient = charlie
+      transferAmount = 10.0
+  let aliceTokenLedgerCid2 = fromSome aliceRemainingLedger2Opt -- Expecting Some
+
+  -- Alice cancels the TokenTransferLock and receives 10.0 tokens back
+  aliceTokenLedgerCid3 <- submit alice do
+    exerciseCmd charlieTokenTransferLockCid2 Cancel
+
+  debug "Alice cancelled the transfer and received 10.0 tokens back"
+  debug $ "Alice token ledger contract: " <> show aliceTokenLedgerCid3
   
-  -- debug "Charlie received 50 tokens"
-  
-  -- -- Bob creates transfer proposal back to Alice
-  -- aliceProposal2Cid <- submit bob do
-  --   createCmd TokenTransferProposal with
-  --     tokenCid = bobTokenCid
-  --     sender = bob
-  --     recipient = alice
-  --     amount = 10.0
-  --     symbol = "USDT"
-  
-  -- aliceNewTokenCid <- submit alice do
-  --   exerciseCmd aliceProposal2Cid Accept
-  
-  -- debug "Bob proposed and Alice accepted a transfer of 10 tokens"
+  debug "--------------------------------"
 
   -- Query all contracts that can be seen by the Token owner
   allTokenHolders <- query @TokenLedger owner
+  debug "All token holders:"
   debug $ allTokenHolders
 
   -- Query all contracts that can be seen by Alice
   aliceTokenHolders <- query @TokenLedger alice
+  debug "Alice's token holders:"
   debug $ aliceTokenHolders
+
+  -- Query all contracts that can be seen by Bob
+  bobTokenHolders <- query @TokenLedger bob
+  debug "Bob's token holders:"
+  debug $ bobTokenHolders
   
   return ()
 
@@ -116,61 +131,160 @@ testErrorHandling : Script ()
 testErrorHandling = do
   owner <- allocateParty "Owner"
   alice <- allocateParty "Alice"
-  
-  setupCid <- submit owner do
-    createCmd TokenSetup with
-      owner = owner
-      initialSupply = 100.0
-      metadata = createSampleMetadata "Test Token" "TEST"
-      observers = [alice]
+  bob <- allocateParty "Bob"
+  charlie <- allocateParty "Charlie"
 
-  (masterCid, ownerTokenCid) <- submit owner do
+  let usdtMeta = createSampleMetadata "Tether USD" "USDT"
+
+  -- Setup: Owner initializes USDT token type
+  setupCid <- submit owner do 
+    createCmd TokenSetup with 
+      owner = owner
+      initialSupply = 0.0
+      metadata = usdtMeta
+      observers = [alice, bob, charlie]
+
+  (masterCid, ownerLedgerCid) <- submit owner do 
     exerciseCmd setupCid Initialize
-  
-  -- Create transfer proposal for Alice
-  aliceProposalCid <- submit owner do
-    createCmd TokenTransferProposal with
-      tokenCid = ownerTokenCid
-      sender = owner
+  debug "Token system initialized."
+
+  -- Mint: zero/negative amount
+  submitMustFail owner do exerciseCmd masterCid Mint with amount = 0.0
+  submitMustFail owner do exerciseCmd masterCid Mint with amount = -10.0
+  debug "Mint with zero/negative amount failed as expected."
+
+  -- Mint: by non-owner
+  submitMustFail alice do exerciseCmd masterCid Mint with amount = 10.0
+  debug "Mint by non-owner failed as expected."
+
+  -- Mint: valid
+  (masterCid2, ownerLedgerCid2) <- submit owner do 
+    exerciseCmd masterCid Mint with amount = 100.0
+
+  -- LockTokenForTransfer: zero/negative/more-than-balance
+  submitMustFail owner do 
+    exerciseCmd ownerLedgerCid2 LockTokenForTransfer with 
       recipient = alice
-      amount = 100.0
-  
-  aliceTokenCid <- submit alice do
-    exerciseCmd aliceProposalCid Accept
-  
-  -- Test error cases with Alice's tokens
-  -- Create a proposal with excessive amount (this should succeed)
-  excessiveProposalCid <- submit alice do
-    createCmd TokenTransferProposal with
-      tokenCid = aliceTokenCid
-      sender = alice
-      recipient = owner
-      amount = 150.0  -- More than available
-  
-  -- But accepting it should fail due to insufficient balance
-  submitMustFail owner do
-    exerciseCmd excessiveProposalCid Accept
-  
-  debug "Transfer proposal acceptance with excessive amount correctly failed"
-  
-  submitMustFail owner do
-    exerciseCmd masterCid Mint with
-      amount = (-50.0)
-  
-  debug "Minting negative amount correctly failed"
-  
+      transferAmount = 0.0
+  submitMustFail owner do 
+    exerciseCmd ownerLedgerCid2 LockTokenForTransfer with 
+      recipient = alice
+      transferAmount = -5.0
+  submitMustFail owner do 
+    exerciseCmd ownerLedgerCid2 LockTokenForTransfer with 
+      recipient = alice
+      transferAmount = 200.0
+  debug "LockTokenForTransfer with invalid amounts failed as expected."
+
+  -- LockTokenForTransfer: by non-holder
+  submitMustFail alice do 
+    exerciseCmd ownerLedgerCid2 LockTokenForTransfer with 
+      recipient = bob
+      transferAmount = 10.0
+  debug "LockTokenForTransfer by non-holder failed as expected."
+
+  -- LockTokenForTransfer: valid
+  (lockCid, ownerLedgerCid3Opt) <- submit owner do exerciseCmd ownerLedgerCid2 LockTokenForTransfer with recipient = alice, transferAmount = 30.0
+  let ownerLedgerCid3 = fromSome ownerLedgerCid3Opt
+  debug "LockTokenForTransfer by owner succeeded."
+
+  -- Accept: by non-recipient
+  submitMustFail bob do exerciseCmd lockCid Accept
+  submitMustFail owner do exerciseCmd lockCid Accept
+  debug "Accept by non-recipient failed as expected."
+
+  -- Accept: valid
+  aliceLedgerCid1 <- submit alice do exerciseCmd lockCid Accept
+  debug "Accept by recipient succeeded."
+
+  -- Accept: double Accept (contract already archived)
+  submitMustFail alice do exerciseCmd lockCid Accept
+  debug "Double Accept failed as expected."
+
+  -- Owner's ledger after Alice accepted: ownerLedgerCid3
+  -- Lock another 10 for Bob from owner's current ledger
+  (lockCid2, ownerLedgerCid4Opt) <- submit owner do 
+    exerciseCmd ownerLedgerCid3 LockTokenForTransfer with 
+      recipient = bob
+      transferAmount = 10.0
+  let ownerLedgerCid4 = fromSome ownerLedgerCid4Opt
+
+  -- Cancel: by non-sender
+  submitMustFail alice do exerciseCmd lockCid2 Cancel
+  debug "Cancel by non-sender failed as expected."
+
+  -- Cancel: valid
+  ownerLedgerCid5 <- submit owner do exerciseCmd lockCid2 Cancel
+  debug "Cancel by sender succeeded."
+
+  -- Cancel: double Cancel (contract already archived)
+  submitMustFail owner do exerciseCmd lockCid2 Cancel
+  debug "Double Cancel failed as expected."
+
+  -- Lock another 10 for Charlie from owner's current ledger
+  (lockCid3, ownerLedgerCid6Opt) <- submit owner do 
+    exerciseCmd ownerLedgerCid5 LockTokenForTransfer with 
+      recipient = charlie
+      transferAmount = 10.0
+  let ownerLedgerCid6 = fromSome ownerLedgerCid6Opt
+
+  -- Reject: by non-recipient
+  submitMustFail alice do exerciseCmd lockCid3 Reject
+  submitMustFail owner do exerciseCmd lockCid3 Reject
+  debug "Reject by non-recipient failed as expected."
+
+  -- Reject: valid
+  reverseLockCid <- submit charlie do exerciseCmd lockCid3 Reject
+  debug "Reject by recipient succeeded."
+
+  -- Accept: by wrong party on reverse lock
+  -- submitMustFail owner do exerciseCmd reverseLockCid Accept
+  submitMustFail bob do exerciseCmd reverseLockCid Accept
+  debug "Accept by wrong party on reverse lock failed as expected."
+
+  -- Accept: valid on reverse lock (should go to owner)
+  ownerLedgerCid7 <- submit owner do exerciseCmd reverseLockCid Accept
+  debug "Accept by correct party on reverse lock succeeded."
+
+  -- Burn: by non-owner
+  submitMustFail alice do exerciseCmd masterCid2 Burn with tokenCid = ownerLedgerCid2
+  debug "Burn by non-owner failed as expected."
+
+  -- Burn: wrong token type
+  let btcMeta = createSampleMetadata "Bitcoin" "BTC"
+  ownerBtc <- allocateParty "OwnerBTC"
+  setupBtcCid <- submit ownerBtc do 
+    createCmd TokenSetup with 
+      owner = ownerBtc
+      initialSupply = 10.0
+      metadata = btcMeta
+      observers = []
+
+  (masterBtcCid, ownerBtcLedgerCid) <- submit ownerBtc do 
+    exerciseCmd setupBtcCid Initialize
+
+  submitMustFail owner do 
+    exerciseCmd masterCid2 Burn with tokenCid = ownerBtcLedgerCid
+  debug "Burn with wrong token type failed as expected."
+
+  -- Burn: valid (use latest active owner ledger)
+  _ <- submit ownerBtc do 
+    exerciseCmd masterBtcCid Burn with 
+      tokenCid = ownerBtcLedgerCid
+  debug "Burn by owner succeeded."
+
+  debug "All error handling tests completed."
   return ()
 
 main : Script ()
 main = do
   debug "Running TokenLedger tests..."
   
-  debug "=== Testing Token Lifecycle ==="
-  testTokenLifecycle
+  debug "=== Testing Token Lifecycle (existing test - not run here again) ==="
+  testTokenLifecycle -- Assuming this is run separately or already covers main happy paths
   
   debug "=== Testing Error Handling ==="
   testErrorHandling
   
-  debug "All tests completed successfully!"
-  
+  debug "TokenLedger tests (error handling) completed successfully!"
   return () 

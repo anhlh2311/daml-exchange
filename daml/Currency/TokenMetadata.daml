@@ -7,9 +7,9 @@ data TokenMetadata = TokenMetadata
     symbol : Text            -- Token symbol (e.g., "USDT")
     decimals : Int           -- Number of decimal places (e.g., 6 for USDT)
     description : Text       -- Token description
-    website : Optional Text  -- Official website URL
-    logoUrl : Optional Text  -- Logo image URL
-    category : Text          -- Token category (e.g., "Stablecoin", "Utility", "Security")
+    -- website : Optional Text  -- Official website URL
+    -- logoUrl : Optional Text  -- Logo image URL
+    -- category : Text          -- Token category (e.g., "Stablecoin", "Utility", "Security")
     issuedDate : Time        -- Token issuance date
     version : Text           -- Token contract version
   deriving (Eq, Show)

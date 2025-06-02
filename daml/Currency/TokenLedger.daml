@@ -9,10 +9,10 @@ template TokenLedger
     amount : Decimal
     symbol : Text
     metadata : TokenMetadata
-    observers : [Party]
+    -- observers : [Party]  -- Only used for TokenMaster-level transparency, not balance visibility
   where
     signatory holder
-    observer owner :: observers
+    observer owner  -- Only owner can see all balances, no other observers
 
     key (owner, holder): (Party, Party)
     maintainer key._2
@@ -23,7 +23,7 @@ template TokenLedger
       with
         target : Party
         transferAmount : Decimal
-      controller holder, target
+      controller holder
       do
         assertMsg "Transfer amount must be positive" (transferAmount > 0.0)
         assertMsg "Insufficient balance" (amount >= transferAmount)
@@ -34,21 +34,78 @@ template TokenLedger
           create this with
             holder = target
             amount = transferAmount
-            observers = if target `elem` observers then observers else target :: observers
+            -- observers = if target `elem` observers then observers else target :: observers
+            -- Remove general observers for privacy - only target and owner can see their balance
         else do
           -- Partial transfer
           -- Create a new token contract for the target with the transfer amount
           targetTokenCid <- create this with
             holder = target
             amount = transferAmount
-            observers = if target `elem` observers then observers else target :: observers
+            -- observers = if target `elem` observers then observers else target :: observers
+            -- Remove general observers for privacy - only target and owner can see their balance
           
-          -- Update the current token contract's balance
+          -- Update the current token contract's balance (holder unchanged)
           create this with
             amount = amount - transferAmount
+            -- Remove general observers for privacy - only target and owner can see their balance
 
           -- Return the new token contract
           return targetTokenCid
+
+    -- Split: lock transferAmount for recipient, leave remainder for holder
+    choice LockTokenForTransfer : (ContractId TokenTransferLock, Optional (ContractId TokenLedger))
+      with
+        recipient: Party
+        transferAmount: Decimal
+      controller holder
+      do
+        -- Validation transfer amount
+        assertMsg "Transfer amount must be positive" (transferAmount > 0.0)
+        assertMsg "Insufficient balance" (amount >= transferAmount)
+
+        let remaining = amount - transferAmount
+        -- archive the current token contract
+        -- archive self
+
+        -- Create a new TokenTransferLock contract for the recipient
+        lockCid <- create TokenTransferLock with
+          owner = owner
+          sender = holder
+          recipient = recipient
+          amount = transferAmount
+          symbol = symbol
+          metadata = metadata
+
+        -- Create a new TokenLedger contract for the holder with the remaining balance
+        if remaining > 0.0 then do
+          cid <- create this with
+            amount = remaining
+          
+          return (lockCid, Some cid)
+        else do
+          return (lockCid, None)
+
+    -- Merge: combine two TokenLedger contracts for the same holder
+    choice Merge : ContractId TokenLedger
+      with
+        mergingTokenLedgerCid: ContractId TokenLedger
+      controller holder
+      do
+        mergingTokenLedger <- fetch mergingTokenLedgerCid
+
+        -- Validate the merging token ledger
+        assertMsg "Can only merge tokens from the same holder" (mergingTokenLedger.holder == holder)
+        assertMsg "Can only merge tokens of the same symbol" (mergingTokenLedger.symbol == symbol)
+
+        -- Archive both token ledgers
+        archive self
+        archive mergingTokenLedgerCid
+
+        -- Create and return a new token ledger with the combined balance
+        create this with
+          amount = amount + mergingTokenLedger.amount
+
 
 template TokenMaster
   with
@@ -68,27 +125,40 @@ template TokenMaster
         assertMsg "Mint amount must be positive" (amount > 0.0)
 
         -- fetch the token contract for the owner
-        tokenCid <- fetchByKey @TokenLedger (owner, owner)
-
-        -- archive the old token contract
-        archive tokenCid._1
+        currentTokenLedger <- lookupByKey @TokenLedger (owner, owner)
         
-        -- create a new token contract for the owner
-        tokenCid <- create TokenLedger with
-          owner = owner
-          holder = owner
-          amount = amount
-          symbol = metadata.symbol
-          metadata = metadata
-          observers = observers
+        newTokenLedgerCid <- case currentTokenLedger of
+          Some currentTokenLedgerCid -> do
+            -- Load the current TokenLedger contract
+            ledger <- fetch currentTokenLedgerCid
 
-        debug $ "New token contract: " <> show tokenCid
+            -- Archive the current TokenLedger contract
+            archive currentTokenLedgerCid
+
+            -- Create a new TokenLedger contract for the owner with the combined balance
+            create TokenLedger with
+              owner = owner
+              holder = owner
+              amount = ledger.amount + amount
+              symbol = ledger.symbol
+              metadata = ledger.metadata
+
+          -- If the owner doesn't have a TokenLedger contract, create a new one with the initial balance
+          None -> do
+            create TokenLedger with
+              owner = owner
+              holder = owner
+              amount = amount
+              symbol = metadata.symbol
+              metadata = metadata
+
+        debug $ "New token contract: " <> show newTokenLedgerCid
         debug $ "Amount: " <> show amount
         
         newMasterCid <- create this with
           totalSupply = totalSupply + amount
         
-        return (newMasterCid, tokenCid)
+        return (newMasterCid, newTokenLedgerCid)
 
     choice Burn : ContractId TokenMaster
       with
@@ -103,27 +173,106 @@ template TokenMaster
         create this with
           totalSupply = totalSupply - token.amount
 
-template TokenTransferProposal
+template TokenTransferLock
   with
-    tokenCid : ContractId TokenLedger
-    sender : Party
-    recipient : Party
-    amount : Decimal
+    owner: Party
+    sender: Party
+    recipient: Party
+    amount: Decimal
+    symbol: Text
+    metadata: TokenMetadata
   where
     signatory sender
-    observer recipient
+    observer recipient, owner
 
-    choice Accept : ContractId TokenLedger
+    key (sender, recipient): (Party, Party)
+    maintainer key._1
+
+    -- Accept: recipient receives the tokens, merging with their own balance if needed
+    choice Accept: ContractId TokenLedger
       controller recipient
       do
-        exercise tokenCid Transfer with
-          target = recipient
-          transferAmount = amount
+        -- Lookup the recipient's TokenLedger contract
+        recipientLedger <- lookupByKey @TokenLedger (owner, recipient)
 
+        case recipientLedger of
+          -- If the recipient already has a TokenLedger contract, merge the balances
+          Some recipientLedgerCid -> do
+            recipientLedger <- fetch recipientLedgerCid
+
+            -- Validate the recipient's TokenLedger contract
+            assertMsg "Can only accept tokens of this type" (recipientLedger.symbol == symbol)
+            assertMsg "Can only accept tokens owned by this master" (recipientLedger.owner == owner)
+
+            -- Archive the recipient's current TokenLedger
+            archive recipientLedgerCid
+
+            -- Create a new TokenLedger contract for the recipient with the combined balance
+            create TokenLedger with
+              owner = owner
+              holder = recipient
+              amount = recipientLedger.amount + amount
+              symbol = symbol
+              metadata = metadata
+          
+          -- If the recipient doesn't have a TokenLedger contract, create a new one
+          None -> create TokenLedger with
+              owner = owner
+              holder = recipient
+              amount = amount
+              symbol = symbol
+              metadata = metadata
+
+    -- Reject: recipient declines, sender can reclaim
+    choice Reject : ContractId TokenTransferLock
+      controller recipient
+      do
+        -- Create a new TokenTransferLock contract for the sender with the same amount
+        create TokenTransferLock with
+          owner = owner
+          sender = recipient
+          recipient = sender
+          amount = amount
+          symbol = symbol
+          metadata = metadata
+
+    -- Cancel: sender cancels, can reclaim by archiving this lock and crediting their balance
     choice Cancel : ContractId TokenLedger
       controller sender
       do
-        return tokenCid
+        -- archive self -- Archive the lock itself
+
+        -- Lookup the sender's TokenLedger contract
+        senderLedgerOpt <- lookupByKey @TokenLedger (owner, sender)
+
+        case senderLedgerOpt of
+          -- If the sender already has a TokenLedger contract, merge the balances
+          Some senderLedgerCid -> do
+            -- Fetch the sender's TokenLedger contract
+            fetchedSenderLedger <- fetch senderLedgerCid
+
+            -- Validate the sender's TokenLedger contract
+            assertMsg "Can only cancel tokens of this type" (fetchedSenderLedger.symbol == symbol)
+            assertMsg "Can only cancel tokens owned by this master" (fetchedSenderLedger.owner == owner)
+            
+            -- Archive the sender's TokenLedger contract
+            archive senderLedgerCid
+
+            -- Create a new TokenLedger contract for the sender with the combined amount
+            create TokenLedger with
+              owner = owner
+              holder = sender
+              amount = fetchedSenderLedger.amount + amount 
+              symbol = symbol
+              metadata = metadata
+
+          -- If the sender doesn't have a TokenLedger contract, create a new one with the amount
+          None -> create TokenLedger with
+            owner = owner
+            holder = sender
+            amount = amount
+            symbol = symbol
+            metadata = metadata
 
 template TokenSetup
   with
@@ -145,22 +294,11 @@ template TokenSetup
           metadata = metadata
           observers = observers
         
-        if initialSupply > 0.0
-        then do
-          tokenCid <- create TokenLedger with
-            owner = owner
-            holder = owner
-            amount = initialSupply
-            symbol = metadata.symbol
-            metadata = metadata
-            observers = observers
-          return (masterCid, tokenCid)
-        else do
-          tokenCid <- create TokenLedger with
-            owner = owner
-            holder = owner
-            amount = 0.0
-            symbol = metadata.symbol
-            metadata = metadata
-            observers = observers
-          return (masterCid, tokenCid) 
+        tokenLedgerCid <- create TokenLedger with
+          owner = owner
+          holder = owner
+          amount = initialSupply
+          symbol = metadata.symbol
+          metadata = metadata
+          -- observers = observers  -- Keep observers list for compatibility but don't use in observer clause
+        return (masterCid, tokenLedgerCid)
