@@ -86,27 +86,6 @@ template TokenLedger
         else do
           return (lockCid, None)
 
-    -- Merge: combine two TokenLedger contracts for the same holder
-    choice Merge : ContractId TokenLedger
-      with
-        mergingTokenLedgerCid: ContractId TokenLedger
-      controller holder
-      do
-        mergingTokenLedger <- fetch mergingTokenLedgerCid
-
-        -- Validate the merging token ledger
-        assertMsg "Can only merge tokens from the same holder" (mergingTokenLedger.holder == holder)
-        assertMsg "Can only merge tokens of the same symbol" (mergingTokenLedger.symbol == symbol)
-
-        -- Archive both token ledgers
-        archive self
-        archive mergingTokenLedgerCid
-
-        -- Create and return a new token ledger with the combined balance
-        create this with
-          amount = amount + mergingTokenLedger.amount
-
-
 template TokenMaster
   with
     owner : Party
@@ -160,18 +139,34 @@ template TokenMaster
         
         return (newMasterCid, newTokenLedgerCid)
 
-    choice Burn : ContractId TokenMaster
+    choice Burn : (ContractId TokenMaster, Optional (ContractId TokenLedger))
       with
         tokenCid : ContractId TokenLedger
+        amountToBurn : Decimal
       controller owner
       do
         token <- fetch tokenCid
         assertMsg "Can only burn tokens of this type" (token.symbol == metadata.symbol)
         assertMsg "Can only burn tokens owned by this master" (token.owner == owner)
+        assertMsg "Insufficient balance" (token.amount >= amountToBurn)
         
         archive tokenCid
-        create this with
-          totalSupply = totalSupply - token.amount
+
+        newTokenLedgerCid <- if token.amount > amountToBurn then do
+          ledgerCid <- create TokenLedger with
+            holder = owner
+            amount = token.amount - amountToBurn
+            symbol = token.symbol
+            ..
+
+            return (Some ledgerCid)
+        else do
+          return (None)
+
+        newTokenMasterCid <- create this with
+          totalSupply = totalSupply - amountToBurn
+        
+        return (newTokenMasterCid, newTokenLedgerCid)
 
 template TokenTransferLock
   with
