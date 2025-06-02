@@ -6,6 +6,7 @@ import Currency.TokenMetadata
 import DA.Time
 import DA.Date
 import DA.Optional (fromSome)
+import DA.List (head)
 
 -- Helper function to create sample metadata
 createSampleMetadata : Text -> Text -> TokenMetadata
@@ -125,6 +126,77 @@ testTokenLifecycle = do
   debug "Bob's token holders:"
   debug $ bobTokenHolders
   
+  return ()
+
+testBurningAndSupply: Script ()
+testBurningAndSupply = do
+  owner <- allocateParty "Owner"
+  alice <- allocateParty "Alice"
+  bob <- allocateParty "Bob"
+  charlie <- allocateParty "Charlie"
+
+  let usdtMetadata = createSampleMetadata "Tether USD" "USDT"
+
+  setupCid <- submit owner do 
+    createCmd TokenSetup with 
+      owner = owner
+      initialSupply = 0.0
+      metadata = usdtMetadata
+      observers = [alice, bob, charlie]
+
+  (masterCid, ownerLedgerCid) <- submit owner do 
+    exerciseCmd setupCid Initialize
+
+  debug "Token system initialized."
+
+  -- Owner mints 100 tokens
+  (masterCid2, ownerLedgerCid2) <- submit owner do 
+    exerciseCmd masterCid Mint with amount = 100.0
+
+  debug "Owner minted 100 tokens."
+
+  -- Owner transfer 30 tokens to Alice
+  (aliceTokenTransferLockCid, ownerLedgerCid3Opt) <- submit owner do 
+    exerciseCmd ownerLedgerCid2 LockTokenForTransfer with 
+      recipient = alice
+      transferAmount = 30.0
+  let ownerLedgerCid3 = fromSome ownerLedgerCid3Opt
+  -- Alice accepts the transfer
+  aliceTokenLedgerCid <- submit alice do 
+    exerciseCmd aliceTokenTransferLockCid Accept
+
+  debug "Alice accepted the transfer."
+
+  -- Owner transfer 20 tokens to Bob
+  (bobTokenTransferLockCid, ownerLedgerCid4Opt) <- submit owner do
+    exerciseCmd ownerLedgerCid3 LockTokenForTransfer with 
+      recipient = bob
+      transferAmount = 20.0
+  let ownerLedgerCid4 = fromSome ownerLedgerCid4Opt
+
+  ownerLedger <- queryContractId owner ownerLedgerCid4
+  debug $ "Owner ledger: " <> show ownerLedger
+
+  -- Bob accepts the transfer
+  bobTokenLedgerCid <- submit bob do 
+    exerciseCmd bobTokenTransferLockCid Accept
+
+  -- Query owner's TokenMaster
+  ownerTokenMaster <- queryContractId owner masterCid2
+  debug $ "Owner token master: " <> show ownerTokenMaster
+
+  -- Owner burns 10 tokens
+  _ <- submit owner do 
+    exerciseCmd masterCid2 Burn with 
+      tokenCid = ownerLedgerCid4
+      amount = 10.0
+  debug "Owner burned 10 tokens."
+
+  -- Query the total supply
+  ownerTokenMasterScript <- query @TokenMaster owner
+  let ownerTokenMasterContract = head (ownerTokenMasterScript)
+  debug $ "Total supply: " <> show ownerTokenMasterContract._2.totalSupply
+
   return ()
 
 testErrorHandling : Script ()
@@ -247,7 +319,10 @@ testErrorHandling = do
   debug "Accept by correct party on reverse lock succeeded."
 
   -- Burn: by non-owner
-  submitMustFail alice do exerciseCmd masterCid2 Burn with tokenCid = ownerLedgerCid2
+  submitMustFail alice do 
+    exerciseCmd masterCid2 Burn with 
+      tokenCid = ownerLedgerCid2
+      amount = 10.0
   debug "Burn by non-owner failed as expected."
 
   -- Burn: wrong token type
@@ -264,13 +339,16 @@ testErrorHandling = do
     exerciseCmd setupBtcCid Initialize
 
   submitMustFail owner do 
-    exerciseCmd masterCid2 Burn with tokenCid = ownerBtcLedgerCid
+    exerciseCmd masterCid2 Burn with 
+      tokenCid = ownerBtcLedgerCid
+      amount = 10.0
   debug "Burn with wrong token type failed as expected."
 
   -- Burn: valid (use latest active owner ledger)
   _ <- submit ownerBtc do 
     exerciseCmd masterBtcCid Burn with 
       tokenCid = ownerBtcLedgerCid
+      amount = 10.0
   debug "Burn by owner succeeded."
 
   debug "All error handling tests completed."
