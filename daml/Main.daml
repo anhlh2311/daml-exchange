@@ -1,0 +1,53 @@
+module Main where
+
+import Daml.Script
+
+import Currency.TokenLedger
+import Currency.TokenMetadata
+
+setup: Script ()
+setup = do
+    -- allocate parties--
+    -- usdtOwner <- allocatePartyWithHint "USDT Owner" (PartyIdHint "USDTOwner")
+    -- usdcOwner <- allocatePartyWithHint "USDC Owner" (PartyIdHint "USDCOwner")
+    owner <- allocatePartyWithHint "TokenOwner" (PartyIdHint "Owner")
+    alice <- allocatePartyWithHint "Holder" (PartyIdHint "Alice")
+    bob <- allocatePartyWithHint "Holder" (PartyIdHint "Bob")
+    charlie <- allocatePartyWithHint "Holder" (PartyIdHint "Charlie")
+
+    -- construct user ids from text strings
+    ownerId <- validateUserId "Owner"
+    -- usdcOwnerId <- validateUserId "Owner"
+    aliceId <- validateUserId "Alice"
+    bobId <- validateUserId "Bob"
+    charlieId <- validateUserId "Charlie"
+
+    -- create token metadata
+    usdtMetadata <- createMetadata "Tether USD" "USDT"
+    -- usdcMetadata <- createMetadata "USD Coin" "USDC"
+
+    -- create user with given rights
+    createUser (User ownerId (Some owner)) [CanActAs owner]
+    -- createUser (User usdcOwnerId (Some owner)) [CanActAs owner]
+    createUser (User aliceId (Some alice)) [CanActAs alice]
+    createUser (User bobId (Some bob)) [CanActAs bob]
+    createUser (User charlieId (Some charlie)) [CanActAs charlie]
+
+    -- create token setup
+    setupUSDTCid <- submit owner do
+        createCmd TokenSetup with
+            owner = owner
+            initialSupply = 0.0
+            metadata = usdtMetadata
+            observers = [alice, bob, charlie]
+
+    -- setupUSDCid <- submit owner do
+    --     createCmd TokenSetup with
+    --         owner = owner
+    --         initialSupply = 0.0
+    --         metadata = usdcMetadata
+    --         observers = [alice, bob, charlie]
+
+    (usdtMasterCid, usdtTokenLedgerCid) <- submit owner do
+        exerciseCmd setupUSDTCid Initialize
+    return ()

@@ -1,5 +1,7 @@
 module Currency.TokenMetadata where
 
+import Daml.Script
+
 -- Token metadata record containing comprehensive token information
 data TokenMetadata = TokenMetadata
   with
@@ -13,3 +15,15 @@ data TokenMetadata = TokenMetadata
     issuedDate : Time        -- Token issuance date
     version : Text           -- Token contract version
   deriving (Eq, Show)
+
+createMetadata: Text -> Text -> Script TokenMetadata
+createMetadata name symbol = do
+  now <- getTime
+  return TokenMetadata with
+    name = name
+    symbol = symbol
+    decimals = 6
+    description = ""
+    issuedDate = now
+    version = "1.0.0"
+  
