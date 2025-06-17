@@ -1,0 +1,118 @@
+module Test.PartyManagementTest where
+
+import Daml.Script
+import Registry.PartyRegistry
+import Scripts.PartyManagement
+
+testPartyManagement : Script ()
+testPartyManagement = do
+  debug "Testing Party Management..."
+  debug "-----------------------------------"
+  
+  -- Test 1: Initialize registry (should work even if admin exists)
+  debug "1. Testing registry initialization..."
+  cmdInit
+  debug "-----------------------------------"
+  
+  -- Test 2: Initialize again (should find existing registry)
+  debug "2. Testing duplicate registry initialization..."
+  cmdInit
+  debug "-----------------------------------"
+  
+  -- Test 3: Add a party
+  debug "3. Testing party addition..."
+  cmdAddParty "TestUser"
+  debug "-----------------------------------"
+
+  -- Test 4: Add same party again (should skip)
+  debug "4. Testing duplicate party addition..."
+  cmdAddParty "TestUser"
+  debug "-----------------------------------"
+
+  -- Test 5: List parties
+  debug "5. Testing party listing..."
+  cmdListParties
+  debug "-----------------------------------"
+  
+
+  debug "✅ All tests completed successfully!"
+
+-- Demo script showing all functionality
+demoPartyManagement : Script ()
+demoPartyManagement = do
+  debug "🚀 Starting Party Management Demo..."
+  
+  -- Initialize
+  debug "\n1. Initializing registry..."
+  cmdInit
+  
+  -- Add parties
+  debug "\n2. Adding parties..."
+  cmdAddParty "Alice"
+  cmdAddParty "Bob"
+  cmdAddParty "Charlie"
+  
+  -- List parties
+  debug "\n3. Listing all parties..."
+  cmdListParties
+  
+  -- Check specific party
+  debug "\n4. Checking if Alice is registered..."
+  cmdCheckParty "Alice"
+  
+  debug "\n5. Checking if David is registered..."
+  cmdCheckParty "David"
+  
+  -- Remove party
+  debug "\n6. Removing Charlie..."
+  cmdRemoveParty "Charlie"
+  
+  -- List parties again
+  debug "\n7. Listing parties after removal..."
+  cmdListParties
+  
+  debug "\n🎉 Demo completed successfully!"
+
+-- Simple test that creates everything from scratch (no queries)
+simplePartyManagementTest : Script ()
+simplePartyManagementTest = do
+  debug "🧪 Simple Party Management Test (Fresh Start)..."
+  
+  -- Step 1: Create admin party
+  debug "\n1. Creating admin party..."
+  admin <- allocatePartyOn "Admin" (ParticipantName "sandbox")
+  debug $ "Created admin: " <> show admin
+  
+  -- Step 2: Create registry directly
+  debug "\n2. Creating registry..."
+  registryCid <- submit admin do
+    createCmd PartyRegistry with
+      admin = admin
+      registeredParties = [admin]
+  debug $ "Created registry: " <> show registryCid
+  
+  -- Step 3: Create and register a new party
+  debug "\n3. Creating and registering new party..."
+  newParty <- allocatePartyOn "TestUser" (ParticipantName "sandbox")
+  debug $ "Created party: " <> show newParty
+  
+  registryCid2 <- submit admin do
+    exerciseCmd registryCid RegisterParty with
+      newParty = newParty
+  debug $ "Registered party, new registry: " <> show registryCid2
+  
+  -- Step 4: List parties
+  debug "\n4. Listing parties..."
+  parties <- submit admin do
+    exerciseCmd registryCid2 ListParties
+  debug $ "All parties: " <> show parties
+  
+  -- Step 5: Check party registration
+  debug "\n5. Checking party registration..."
+  isRegistered <- submit admin do
+    exerciseCmd registryCid2 IsPartyRegistered with
+      party = newParty
+      requester = admin
+  debug $ "TestUser is registered: " <> show isRegistered
+  
+  debug "\n✅ Simple test completed successfully!" 

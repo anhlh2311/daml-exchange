@@ -1,0 +1,220 @@
+module Scripts.PartyManagement where
+
+import Daml.Script
+import Registry.PartyRegistry
+
+-- Helper function to find or create admin party
+getOrCreateAdminParty : Script Party
+getOrCreateAdminParty = do
+  -- First try to find an existing admin party by display name
+  parties <- listKnownParties
+  case find (\p -> p.displayName == Some "Admin") parties of
+    Some adminDetails -> do
+      debug $ " - Found existing admin party: " <> show adminDetails.party
+      return adminDetails.party
+    None -> do
+      debug " - No existing admin party found, creating new one..."
+      -- admin <- allocatePartyOn "Admin" (ParticipantName "sandbox")
+      admin <- allocatePartyWithHint "Admin" (PartyIdHint "Admin")
+      debug $ "    >> Created new admin party: " <> show admin
+      return admin
+
+-- Helper function to find or create a party by name
+getOrCreateParty : Text -> Script Party
+getOrCreateParty name = do
+  parties <- listKnownParties
+  case find (\p -> p.displayName == Some name) parties of
+    Some partyDetails -> do
+      debug $ "     >> Found existing party '" <> name <> "': " <> show partyDetails.party
+      return partyDetails.party
+    None -> do
+      debug $ " - Creating new party: " <> name
+      -- party <- allocatePartyOn name (ParticipantName "sandbox")
+      party <- allocatePartyWithHint name (PartyIdHint name)
+      debug $ "       >> Created party '" <> name <> "': " <> show party
+      return party
+
+-- Helper function to find any existing registry (using different lookup strategies)
+findExistingRegistryInternal : Party -> Script (Optional (ContractId PartyRegistry, PartyRegistry))
+findExistingRegistryInternal admin = do
+  -- Strategy 1: Find all registries and pick the first one
+  registries <- query @PartyRegistry admin
+  debug $ "    >> Found " <> show (length registries) <> " registries"
+  case registries of
+    (registryCid, registry) :: _ -> do
+      debug $ "     Using existing registry with admin: " <> show registry.admin
+      return (Some (registryCid, registry))
+    [] -> do
+      return None
+
+-- Initialize the party registry with admin
+initializeRegistry : Script (ContractId PartyRegistry)
+initializeRegistry = do
+  admin <- getOrCreateAdminParty
+  debug $ " - Initializing registry with admin: " <> show admin
+  
+  -- Check if registry already exists
+  existingRegistry <- findExistingRegistryInternal admin
+  case existingRegistry of
+    Some (registryCid, registry) -> do
+      debug $ "     Registry already exists with ID: " <> show registryCid
+      debug $ "     Registry admin: " <> show registry.admin
+      debug $ "     Registry parties: " <> show registry.registeredParties
+      debug "       >> Registry initialization skipped - using existing registry!"
+      return registryCid
+    None -> do
+      debug " - Creating new registry..."
+      registryCid <- submit admin do
+        createCmd PartyRegistry with
+          admin = admin
+          registeredParties = [admin]
+      debug $ "     Registry initialized with admin: " <> show admin
+      debug $ "     Registry contract ID: " <> show registryCid
+      debug "       >> Registry initialized successfully!"
+      return registryCid
+
+-- Allocate a new party and register it in the party registry
+allocateAndRegisterParty : Party -> Text -> Script Party
+allocateAndRegisterParty admin name = do
+  -- admin <- getOrCreateAdminParty
+  
+  -- Find the registry
+  existingRegistry <- findExistingRegistryInternal admin
+  case existingRegistry of
+    Some (registryCid, registry) -> do
+      debug $ "     Using existing registry: " <> show registryCid
+      
+      -- Check if party already exists
+      party <- getOrCreateParty name
+      
+      -- Check if party is already registered
+      if party `elem` registry.registeredParties
+      then do
+        debug $ " - Party '" <> name <> "' is already registered"
+        debug "       >> Party registration skipped - already exists!"
+        return party
+      else do
+        -- Register the party
+        newRegistryCid <- submit admin do
+          exerciseCmd registryCid RegisterParty with
+            newParty = party
+        debug $ "     Party '" <> name <> "' registered successfully"
+        debug $ "     Party ID: " <> show party
+        debug $ "     New registry ID: " <> show newRegistryCid
+        debug "       >> Party registration completed!"
+        return party
+        
+    None -> do
+      debug "No registry found, creating new one..."
+      party <- getOrCreateParty name
+      
+      registryCid <- submit admin do
+        createCmd PartyRegistry with
+          admin = admin
+          registeredParties = [admin, party]
+      
+      debug $ "Created new registry with parties: [" <> show admin <> ", " <> show party <> "]"
+      debug $ "✅ Party '" <> name <> "' added successfully!"
+      debug $ "   Party ID: " <> show party
+      return party
+
+-- List all registered parties
+listRegisteredParties : Party -> Script [Party]
+listRegisteredParties admin = do
+  -- admin <- getOrCreateAdminParty
+  
+  existingRegistry <- findExistingRegistryInternal admin
+  case existingRegistry of
+    Some (registryCid, _) -> do
+      parties <- submit admin do
+        exerciseCmd registryCid ListParties
+      debug $ "     >> Registered parties: " <> show parties
+      return parties
+    None -> do
+      debug "   - No registry found"
+      return []
+
+-- Check if a party is registered
+checkPartyRegistration : Party -> Text -> Script Bool
+checkPartyRegistration admin name = do
+  -- admin <- getOrCreateAdminParty
+  
+  existingRegistry <- findExistingRegistryInternal admin
+  case existingRegistry of
+    Some (registryCid, _) -> do
+      -- Try to find the party
+      parties <- listKnownParties
+      case find (\p -> p.displayName == Some name) parties of
+        Some partyDetails -> do
+          isRegistered <- submit admin do
+            exerciseCmd registryCid IsPartyRegistered with
+              party = partyDetails.party
+              requester = admin
+          debug $ "   - Party '" <> name <> "' registration status: " <> show isRegistered
+          return isRegistered
+        None -> do
+          debug $ "   - Party '" <> name <> "' not found on ledger"
+          return False
+    None -> do
+      debug "   - No registry found"
+      return False
+
+-- Remove a party from the registry
+removeParty : Party -> Text -> Script ()
+removeParty admin name = do
+  -- admin <- getOrCreateAdminParty
+  
+  existingRegistry <- findExistingRegistryInternal admin
+  case existingRegistry of
+    Some (registryCid, _) -> do
+      -- Find the party
+      parties <- listKnownParties
+      case find (\p -> p.displayName == Some name) parties of
+        Some partyDetails -> do
+          newRegistryCid <- submit admin do
+            exerciseCmd registryCid UnregisterParty with
+              partyToRemove = partyDetails.party
+          debug $ "   - Party '" <> name <> "' removed successfully"
+          debug $ "     >> New registry ID: " <> show newRegistryCid
+          return ()
+        None -> do
+          debug $ "   - Party '" <> name <> "' not found on ledger"
+          return ()
+    None -> do
+      debug "   - No registry found"
+      return ()
+
+-- findExistingRegistry : Script (Optional (ContractId PartyRegistry, PartyRegistry))
+-- findExistingRegistry = do
+--   admin <- getOrCreateAdminParty
+--   findExistingRegistryInternal admin
+
+-- Command interface functions
+cmdInit : Script ()
+cmdInit = do
+  _ <- initializeRegistry
+  return ()
+
+cmdAddParty : Text -> Script ()
+cmdAddParty name = do
+  admin <- getOrCreateAdminParty
+  _ <- allocateAndRegisterParty admin name
+  return ()
+
+cmdListParties : Script ()
+cmdListParties = do
+  admin <- getOrCreateAdminParty
+  _ <- listRegisteredParties admin
+  return ()
+
+cmdCheckParty : Text -> Script ()
+cmdCheckParty name = do
+  admin <- getOrCreateAdminParty
+  _ <- checkPartyRegistration admin name
+  return ()
+
+cmdRemoveParty : Text -> Script ()
+cmdRemoveParty name = do
+  admin <- getOrCreateAdminParty
+  _ <- removeParty admin name
+  return ()
