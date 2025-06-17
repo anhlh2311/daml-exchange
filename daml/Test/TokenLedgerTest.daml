@@ -1,8 +1,9 @@
-module TokenLedgerTest where
+module Test.TokenLedgerTest where
 
 import Daml.Script hiding (trySubmit)
 import Currency.TokenLedger
 import Currency.TokenMetadata
+import Currency.PartyRegistry
 import DA.Time
 import DA.Date
 import DA.Optional (fromSome)
@@ -23,17 +24,24 @@ createSampleMetadata name symbol = TokenMetadata with
 
 testTokenLifecycle : Script ()
 testTokenLifecycle = do
+  admin <- allocateParty "Admin"
   owner <- allocateParty "TokenOwner"
   alice <- allocateParty "Alice" 
   bob <- allocateParty "Bob"
   charlie <- allocateParty "Charlie"
+
+  -- Create party registry
+  registryCid <- submit admin do
+    createCmd PartyRegistry with
+      admin = admin
+      registeredParties = [admin, owner, alice, bob, charlie]
   
   setupCid <- submit owner do
     createCmd TokenSetup with
       owner = owner
       initialSupply = 0.0
       metadata = createSampleMetadata "Tether USD" "USDT"
-      observers = [alice, bob, charlie]
+      registry = registryCid
   
   (masterCid, ownerTokenLedgerCid0) <- submit owner do
     exerciseCmd setupCid Initialize
@@ -130,10 +138,17 @@ testTokenLifecycle = do
 
 testBurningAndSupply: Script ()
 testBurningAndSupply = do
+  admin <- allocateParty "Admin"
   owner <- allocateParty "Owner"
   alice <- allocateParty "Alice"
   bob <- allocateParty "Bob"
   charlie <- allocateParty "Charlie"
+
+  -- Create party registry
+  registryCid <- submit admin do
+    createCmd PartyRegistry with
+      admin = admin
+      registeredParties = [admin, owner, alice, bob, charlie]
 
   let usdtMetadata = createSampleMetadata "Tether USD" "USDT"
 
@@ -142,7 +157,7 @@ testBurningAndSupply = do
       owner = owner
       initialSupply = 0.0
       metadata = usdtMetadata
-      observers = [alice, bob, charlie]
+      registry = registryCid
 
   (masterCid, ownerLedgerCid) <- submit owner do 
     exerciseCmd setupCid Initialize
@@ -221,10 +236,17 @@ testBurningAndSupply = do
 
 testErrorHandling : Script ()
 testErrorHandling = do
+  admin <- allocateParty "Admin"
   owner <- allocateParty "Owner"
   alice <- allocateParty "Alice"
   bob <- allocateParty "Bob"
   charlie <- allocateParty "Charlie"
+
+  -- Create party registry
+  registryCid <- submit admin do
+    createCmd PartyRegistry with
+      admin = admin
+      registeredParties = [admin, owner, alice, bob, charlie]
 
   let usdtMeta = createSampleMetadata "Tether USD" "USDT"
 
@@ -234,7 +256,7 @@ testErrorHandling = do
       owner = owner
       initialSupply = 0.0
       metadata = usdtMeta
-      observers = [alice, bob, charlie]
+      registry = registryCid
 
   (masterCid, ownerLedgerCid) <- submit owner do 
     exerciseCmd setupCid Initialize
@@ -348,12 +370,17 @@ testErrorHandling = do
   -- Burn: wrong token type
   let btcMeta = createSampleMetadata "Bitcoin" "BTC"
   ownerBtc <- allocateParty "OwnerBTC"
+
+  registryCid <- submit admin do
+    exerciseCmd registryCid RegisterParty with 
+      newParty = ownerBtc
+
   setupBtcCid <- submit ownerBtc do 
     createCmd TokenSetup with 
       owner = ownerBtc
       initialSupply = 10.0
       metadata = btcMeta
-      observers = []
+      registry = registryCid
 
   (masterBtcCid, ownerBtcLedgerCid) <- submit ownerBtc do 
     exerciseCmd setupBtcCid Initialize
