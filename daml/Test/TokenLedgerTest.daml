@@ -3,7 +3,7 @@ module Test.TokenLedgerTest where
 import Daml.Script hiding (trySubmit)
 import Currency.TokenLedger
 import Currency.TokenMetadata
-import Currency.PartyRegistry
+import Registry.PartyRegistry
 import DA.Time
 import DA.Date
 import DA.Optional (fromSome)

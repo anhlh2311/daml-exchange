@@ -1,6 +1,6 @@
 module Test.PartyRegistryTest where
 
-import Currency.PartyRegistry
+import Registry.PartyRegistry
 
 import Daml.Script
 

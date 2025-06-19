@@ -1,7 +1,7 @@
 module Currency.TokenLedger where
 
 import Currency.TokenMetadata
-import Currency.PartyRegistry
+import Registry.PartyRegistry
 
 template TokenLedger
   with

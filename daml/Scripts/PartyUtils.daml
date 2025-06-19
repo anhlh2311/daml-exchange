@@ -1,0 +1,106 @@
+module Scripts.PartyUtils where
+
+import Daml.Script
+
+-- Core party query functions
+-- Find party details by name from the list of known parties
+getPartyDetailsByName : Text -> Script (Optional PartyDetails)
+getPartyDetailsByName name = do
+  parties <- listKnownParties
+  case find (\p -> p.displayName == Some name) parties of
+    Some partyDetails -> do
+      return (Some partyDetails)
+    None -> return None
+
+-- Old implementation - Find party by name from the list of known parties
+-- getPartyByName : Text -> Script (Optional Party)
+-- getPartyByName name = do
+--   partyDetails <- getPartyDetailsByName name
+--   case partyDetails of
+--     Some partyDetails -> do
+--       return (Some partyDetails.party)
+--     None -> return None
+
+-- New implementation - Find party by name from the list of known parties (using currying)
+-- Function Composition:
+--  getPartyDetailsByName name → Script (Optional PartyDetails)
+--  fmap (.party) → Applies .party field access to extract Party from PartyDetails
+--  Outer fmap → Lifts the operation into the Script context
+--
+-- Type Transformations:
+--  getPartyDetailsByName name : Script (Optional PartyDetails)
+--  fmap (.party) : Optional PartyDetails -> Optional Party
+--  fmap (fmap (.party)) : Script (Optional PartyDetails) -> Script (Optional Party)
+--
+getPartyByName : Text -> Script (Optional Party)
+getPartyByName name = fmap (fmap (.party)) (getPartyDetailsByName name)
+
+createParty name = allocatePartyWithHint name (PartyIdHint name)
+
+-- User creation utilities
+createUserFromParty : Party -> Script User
+createUserFromParty party = do 
+  userId <- validateUserId (show party)
+  let user = User userId (Some party)
+  createUser user [CanActAs party]
+  return user
+
+-----------------------------------------------
+-- Admin party management
+-- Old implementation
+-- getAdminParty : Script (Optional Party)
+-- getAdminParty = do
+--   admin <- getPartyByName "Admin"
+--   case admin of
+--     Some admin -> return (Some admin)
+--     None -> return None
+
+-- New implementation - Find admin party by name from the list of known parties (using currying)
+-- Function Composition:
+--  getPartyDetailsByName "Admin" → Script (Optional PartyDetails)
+--  fmap (.party) → Applies .party field access to extract Party from PartyDetails
+--  Outer fmap → Lifts the operation into the Script context
+--
+getAdminParty = fmap (fmap (.party)) (getPartyDetailsByName "Admin")
+
+-- Create admin party
+createAdminParty = createParty "Admin"
+
+-- Find or create admin party
+getOrCreateAdminParty : Script Party
+getOrCreateAdminParty = do
+  -- First try to find an existing admin party by display name
+  admin <- getAdminParty
+  
+  case admin of
+    Some admin -> do
+      debug $ " - Found existing admin party: " <> show admin
+      return admin
+    None -> do
+      debug " - No existing admin party found, creating new one..."
+      admin <- createAdminParty
+      debug $ "    >> Created new admin party: " <> show admin
+      user <- createUserFromParty admin
+      debug $ "    >> Created Admin user: " <> show user
+      return admin
+
+------------------------------------------------
+-- Party management
+------------------------------------------------
+-- Find or create a party by name
+getOrCreateParty : Text -> Script Party
+getOrCreateParty name = do
+  party <- getPartyByName name
+  case party of
+    Some party -> do
+      debug $ "     >> Found existing party '" <> name <> "': " <> show party
+      return party
+    None -> do
+      debug $ " - Creating new party: " <> name
+      -- party <- allocatePartyOn name (ParticipantName "sandbox")
+      party <- createParty name
+      debug $ "       >> Created party '" <> name <> "': " <> show party
+      user <- createUserFromParty party
+      debug $ "       >> Created user: " <> show user
+      return party
+

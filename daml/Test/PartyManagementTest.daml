@@ -6,7 +6,7 @@ import Scripts.PartyManagement
 
 testPartyManagement : Script ()
 testPartyManagement = do
-  debug "Testing Party Management..."
+  debug "<< Testing Party Management... >>"
   debug "-----------------------------------"
   
   -- Test 1: Initialize registry (should work even if admin exists)
@@ -35,84 +35,102 @@ testPartyManagement = do
   debug "-----------------------------------"
   
 
-  debug "✅ All tests completed successfully!"
+  debug " +++ All tests completed successfully! +++"
 
 -- Demo script showing all functionality
 demoPartyManagement : Script ()
 demoPartyManagement = do
-  debug "🚀 Starting Party Management Demo..."
-  
+  debug "<< Starting Party Management Demo... >>"
+  debug "-----------------------------------"
   -- Initialize
-  debug "\n1. Initializing registry..."
+  debug "1. Initializing registry..."
   cmdInit
+  debug "-----------------------------------"
   
   -- Add parties
-  debug "\n2. Adding parties..."
+  debug "2. Adding parties..."
   cmdAddParty "Alice"
+  debug "         >> Alice added"
+  debug "   --------------------------------"
   cmdAddParty "Bob"
+  debug "         >> Bob added"
+  debug "   --------------------------------"
   cmdAddParty "Charlie"
-  
+  debug "         >> Charlie added"
+  debug "-----------------------------------"
+
   -- List parties
-  debug "\n3. Listing all parties..."
+  debug "3. Listing all parties..."
   cmdListParties
-  
+  debug "-----------------------------------"
+
   -- Check specific party
-  debug "\n4. Checking if Alice is registered..."
+  debug "4. Checking if Alice is registered..."
   cmdCheckParty "Alice"
-  
-  debug "\n5. Checking if David is registered..."
+  debug "-----------------------------------"
+
+  debug "5. Checking if David is registered..."
   cmdCheckParty "David"
-  
+  debug "-----------------------------------"
+
   -- Remove party
-  debug "\n6. Removing Charlie..."
+  debug "6. Removing Charlie..."
   cmdRemoveParty "Charlie"
-  
+  debug "-----------------------------------"
+
   -- List parties again
-  debug "\n7. Listing parties after removal..."
+  debug "7. Listing parties after removal..."
   cmdListParties
-  
-  debug "\n🎉 Demo completed successfully!"
+  debug "-----------------------------------"
+  debug " +++ Demo completed successfully! +++"
 
 -- Simple test that creates everything from scratch (no queries)
 simplePartyManagementTest : Script ()
 simplePartyManagementTest = do
-  debug "🧪 Simple Party Management Test (Fresh Start)..."
-  
+  debug "<< Simple Party Management Test (Fresh Start)... >>"
+  debug "-----------------------------------"
+
   -- Step 1: Create admin party
-  debug "\n1. Creating admin party..."
+  debug "1. Creating admin party..."
   admin <- allocatePartyOn "Admin" (ParticipantName "sandbox")
   debug $ "Created admin: " <> show admin
+  debug "-----------------------------------"
   
   -- Step 2: Create registry directly
-  debug "\n2. Creating registry..."
+  debug "2. Creating registry..."
   registryCid <- submit admin do
     createCmd PartyRegistry with
       admin = admin
       registeredParties = [admin]
   debug $ "Created registry: " <> show registryCid
-  
+  debug "-----------------------------------"
+
   -- Step 3: Create and register a new party
-  debug "\n3. Creating and registering new party..."
+  debug "3. Creating and registering new party..."
   newParty <- allocatePartyOn "TestUser" (ParticipantName "sandbox")
   debug $ "Created party: " <> show newParty
-  
+  debug "-----------------------------------"
+
   registryCid2 <- submit admin do
     exerciseCmd registryCid RegisterParty with
       newParty = newParty
   debug $ "Registered party, new registry: " <> show registryCid2
-  
+  debug "-----------------------------------"
+
   -- Step 4: List parties
-  debug "\n4. Listing parties..."
+  debug "4. Listing parties..."
   parties <- submit admin do
     exerciseCmd registryCid2 ListParties
   debug $ "All parties: " <> show parties
-  
+  debug "-----------------------------------"
+
   -- Step 5: Check party registration
-  debug "\n5. Checking party registration..."
+  debug "5. Checking party registration..."
   isRegistered <- submit admin do
     exerciseCmd registryCid2 IsPartyRegistered with
       party = newParty
       requester = admin
   debug $ "TestUser is registered: " <> show isRegistered
-  
-  debug "\n✅ Simple test completed successfully!" 
+  debug "-----------------------------------"
+
+  debug " +++ Simple test completed successfully! +++" 
