@@ -1,15 +1,27 @@
 module Scripts.PartyUtils where
 
 import Daml.Script
+import DA.Optional (fromSome)
 
 -- Core party query functions
 -- Find party details by name from the list of known parties
 getPartyDetailsByName : Text -> Script (Optional PartyDetails)
 getPartyDetailsByName name = do
-  parties <- listKnownParties
-  case find (\p -> p.displayName == Some name) parties of
+  find (\p -> p.displayName == Some name)
+  <$> listKnownParties
+
+-- Find party details from a Party object
+getPartyDetailsByParty : Party -> Script (Optional PartyDetails)
+getPartyDetailsByParty partyToFind = do
+  find (\ p -> p.party == partyToFind)
+  <$> listKnownParties
+
+getPartyDisplayName : Party -> Script (Optional Text)
+getPartyDisplayName party = do
+  partyDetails <- getPartyDetailsByParty party
+  case partyDetails of
     Some partyDetails -> do
-      return (Some partyDetails)
+      return (Some (fromSome partyDetails.displayName))
     None -> return None
 
 -- Old implementation - Find party by name from the list of known parties
@@ -39,8 +51,10 @@ createParty name = allocatePartyWithHint name (PartyIdHint name)
 
 -- User creation utilities
 createUserFromParty : Party -> Script User
-createUserFromParty party = do 
-  userId <- validateUserId (show party)
+createUserFromParty party = do
+  partyName <- getPartyDisplayName party
+  userId <- validateUserId (fromSome partyName)
+
   let user = User userId (Some party)
   createUser user [CanActAs party]
   return user
@@ -71,7 +85,7 @@ getOrCreateAdminParty : Script Party
 getOrCreateAdminParty = do
   -- First try to find an existing admin party by display name
   admin <- getAdminParty
-  
+
   case admin of
     Some admin -> do
       debug $ " - Found existing admin party: " <> show admin
