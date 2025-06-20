@@ -1,6 +1,7 @@
 module Currency.TokenLedger where
 
 import Currency.TokenMetadata
+import Registry.PartyRegistry
 
 template TokenLedger
   with
@@ -9,6 +10,7 @@ template TokenLedger
     amount : Decimal
     symbol : Text
     metadata : TokenMetadata
+    registry : ContractId PartyRegistry
   where
     signatory holder
     observer owner  -- Only owner can see all balances, no other observers
@@ -24,6 +26,12 @@ template TokenLedger
         transferAmount : Decimal
       controller holder
       do
+        -- Check if target is registered
+        isRegistered <- exercise registry IsPartyRegistered with 
+          party = target
+          requester = holder
+        assertMsg "Target party is not registered" isRegistered
+        
         assertMsg "Transfer amount must be positive" (transferAmount > 0.0)
         assertMsg "Insufficient balance" (amount >= transferAmount)
         
@@ -55,6 +63,12 @@ template TokenLedger
         transferAmount: Decimal
       controller holder
       do
+        -- Check if recipient is registered
+        isRegistered <- exercise registry IsPartyRegistered with 
+          party = recipient 
+          requester = holder
+        assertMsg "Recipient party is not registered" isRegistered
+
         -- Validation transfer amount
         assertMsg "Transfer amount must be positive" (transferAmount > 0.0)
         assertMsg "Insufficient balance" (amount >= transferAmount)
@@ -65,18 +79,15 @@ template TokenLedger
 
         -- Create a new TokenTransferLock contract for the recipient
         lockCid <- create TokenTransferLock with
-          owner = owner
           sender = holder
-          recipient = recipient
           amount = transferAmount
-          symbol = symbol
-          metadata = metadata
+          ..
 
         -- Create a new TokenLedger contract for the holder with the remaining balance
         if remaining > 0.0 then do
           cid <- create this with
             amount = remaining
-          
+            
           return (lockCid, Some cid)
         else do
           return (lockCid, None)
@@ -86,16 +97,22 @@ template TokenMaster
     owner : Party
     totalSupply : Decimal
     metadata : TokenMetadata
-    observers : [Party]
+    registry : ContractId PartyRegistry
   where
     signatory owner
-    observer observers
+    -- No observers needed - PartyRegistry handles access control
 
     choice Mint : (ContractId TokenMaster, ContractId TokenLedger)
       with
         amount : Decimal
       controller owner
       do
+        -- Check if owner is registered
+        isRegistered <- exercise registry IsPartyRegistered with 
+          party = owner
+          requester = owner
+        assertMsg "Owner party is not registered" isRegistered
+
         assertMsg "Mint amount must be positive" (amount > 0.0)
 
         -- fetch the token contract for the owner
@@ -111,20 +128,17 @@ template TokenMaster
 
             -- Create a new TokenLedger contract for the owner with the combined balance
             create TokenLedger with
-              owner = owner
               holder = owner
               amount = ledger.amount + amount
               symbol = ledger.symbol
-              metadata = ledger.metadata
+              ..
 
           -- If the owner doesn't have a TokenLedger contract, create a new one with the initial balance
           None -> do
             create TokenLedger with
-              owner = owner
               holder = owner
-              amount = amount
               symbol = metadata.symbol
-              metadata = metadata
+              ..
 
         debug $ "New token contract: " <> show newTokenLedgerCid
         debug $ "Amount: " <> show amount
@@ -140,6 +154,12 @@ template TokenMaster
         amountToBurn : Optional Decimal
       controller owner
       do
+        -- Check if owner is registered
+        isRegistered <- exercise registry IsPartyRegistered with 
+          party = owner
+          requester = owner
+        assertMsg "Owner party is not registered" isRegistered
+
         token <- fetch tokenCid
         assertMsg "Can only burn tokens of this type" (token.symbol == metadata.symbol)
         assertMsg "Can only burn tokens owned by this master" (token.owner == owner)
@@ -168,7 +188,7 @@ template TokenMaster
 
             return (Some ledgerCid)
         else do
-          return (None)
+          return None
 
         -- Create a new TokenMaster contract with the updated total supply
         newTokenMasterCid <- create this with
@@ -184,6 +204,7 @@ template TokenTransferLock
     amount: Decimal
     symbol: Text
     metadata: TokenMetadata
+    registry: ContractId PartyRegistry
   where
     signatory sender
     observer recipient, owner
@@ -195,6 +216,12 @@ template TokenTransferLock
     choice Accept: ContractId TokenLedger
       controller recipient
       do
+        -- Check if recipient is registered
+        isRegistered <- exercise registry IsPartyRegistered with 
+          party = recipient
+          requester = recipient
+        assertMsg "Recipient party is not registered" isRegistered
+
         -- Lookup the recipient's TokenLedger contract
         recipientLedger <- lookupByKey @TokenLedger (owner, recipient)
 
@@ -212,19 +239,14 @@ template TokenTransferLock
 
             -- Create a new TokenLedger contract for the recipient with the combined balance
             create TokenLedger with
-              owner = owner
               holder = recipient
               amount = recipientLedger.amount + amount
-              symbol = symbol
-              metadata = metadata
+              ..
           
           -- If the recipient doesn't have a TokenLedger contract, create a new one
           None -> create TokenLedger with
-              owner = owner
               holder = recipient
-              amount = amount
-              symbol = symbol
-              metadata = metadata
+              ..
 
     -- Reject: recipient declines, sender can reclaim
     choice Reject : ContractId TokenTransferLock
@@ -232,18 +254,17 @@ template TokenTransferLock
       do
         -- Create a new TokenTransferLock contract for the sender with the same amount
         create TokenTransferLock with
-          owner = owner
           sender = recipient
           recipient = sender
-          amount = amount
-          symbol = symbol
-          metadata = metadata
+          ..
 
     -- Cancel: sender cancels, can reclaim by archiving this lock and crediting their balance
     choice Cancel : ContractId TokenLedger
       controller sender
       do
-        -- archive self -- Archive the lock itself
+        -- Check if sender is registered
+        isRegistered <- exercise registry IsPartyRegistered with party = sender, requester = sender
+        assertMsg "Sender party is not registered" isRegistered
 
         -- Lookup the sender's TokenLedger contract
         senderLedgerOpt <- lookupByKey @TokenLedger (owner, sender)
@@ -263,45 +284,43 @@ template TokenTransferLock
 
             -- Create a new TokenLedger contract for the sender with the combined amount
             create TokenLedger with
-              owner = owner
               holder = sender
               amount = fetchedSenderLedger.amount + amount 
-              symbol = symbol
-              metadata = metadata
+              ..
 
           -- If the sender doesn't have a TokenLedger contract, create a new one with the amount
           None -> create TokenLedger with
-            owner = owner
             holder = sender
             amount = amount
-            symbol = symbol
-            metadata = metadata
+            ..
 
 template TokenSetup
   with
     owner : Party
     initialSupply : Decimal
     metadata : TokenMetadata
-    observers : [Party]
+    registry : ContractId PartyRegistry
   where
     signatory owner
 
     choice Initialize : (ContractId TokenMaster, ContractId TokenLedger)
       controller owner
       do
+        -- Check if owner is registered
+        isRegistered <- exercise registry IsPartyRegistered with 
+          party = owner
+          requester = owner
+        assertMsg "Owner party is not registered" isRegistered
+
         assertMsg "Initial supply must be non-negative" (initialSupply >= 0.0)
         
         masterCid <- create TokenMaster with
-          owner = owner
           totalSupply = initialSupply
-          metadata = metadata
-          observers = observers
+          ..
         
         tokenLedgerCid <- create TokenLedger with
-          owner = owner
           holder = owner
           amount = initialSupply
           symbol = metadata.symbol
-          metadata = metadata
-          -- observers = observers  -- Keep observers list for compatibility but don't use in observer clause
+          ..
         return (masterCid, tokenLedgerCid)

@@ -1,0 +1,53 @@
+module Test.PartyRegistryTest where
+
+import Registry.PartyRegistry
+
+import Daml.Script
+
+testPartyRegistration: Script ()
+testPartyRegistration = do
+  -- Setup initial parties
+  admin <- allocateParty "Admin"
+  alice <- allocateParty "Alice"
+  bob <- allocateParty "Bob"
+  charlie <- allocateParty "Charlie"
+
+  -- Create party registry
+  registryCid <- submit admin do
+    createCmd PartyRegistry with
+      admin = admin
+      registeredParties = [admin, alice]
+
+  -- Register a new party
+  registryCid2 <- submit admin do
+    exerciseCmd registryCid RegisterParty with
+      newParty = bob
+
+  -- List parties
+  parties <- submit admin do
+    exerciseCmd registryCid2 ListParties
+
+  -- Verify parties
+  assertMsg "Parties list mismatch" (parties == [admin, alice, bob])
+
+  -- Unregister a party
+  registryCid3 <- submit admin do
+    exerciseCmd registryCid2 UnregisterParty with
+      partyToRemove = alice
+
+  -- List parties again
+  parties2 <- submit admin do
+    exerciseCmd registryCid3 ListParties
+
+  -- Verify updated party list
+  assertMsg "Parties list mismatch" (parties2 == [admin, bob])
+
+  -- Try to register an already registered party (should fail)
+  submitMustFail admin do
+    exerciseCmd registryCid3 RegisterParty with
+      newParty = bob
+
+  -- Try to unregister a non-registered party (should fail)
+  submitMustFail admin do
+    exerciseCmd registryCid3 UnregisterParty with
+      partyToRemove = charlie 

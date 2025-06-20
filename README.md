@@ -208,11 +208,161 @@ Test scenarios cover:
 daml build
 
 # Start Daml sandbox
-daml start
+daml sandbox
+
+# Upload DAR to ledger
+daml ledger upload-dar .daml/dist/exchange-0.0.1.dar
 
 # Run tests
 daml test --files ./daml/TokenLedgerTest.daml
 ```
+
+## Party Management
+
+The project includes a comprehensive party management system with improved functional programming patterns and modular architecture.
+
+### Code Architecture
+
+The party management system is organized into two modules:
+
+- **`Scripts.PartyUtils`**: Core party and user utilities with functional programming patterns
+- **`Scripts.PartyManagement`**: Registry operations and CLI command interface
+
+**Key Improvements:**
+
+- **Functional Programming**: Curried implementations using `fmap` composition for cleaner code
+- **Code Separation**: Utility functions separated from business logic for better reusability
+- **Enhanced Type Safety**: Improved admin validation and registry lookup with conflict prevention
+- **Automatic User Creation**: All party creation includes automatic user setup
+
+### Party Registry System
+
+The `PartyRegistry` template manages registered parties who can participate in the token system. All token operations require parties to be registered first.
+
+**Key Features:**
+
+- **Admin Control**: Only admin can register/unregister parties with enhanced validation
+- **Registration Validation**: All token operations check party registration status
+- **Dynamic Management**: Parties can be added/removed at runtime
+- **Visibility**: All registered parties can see the registry
+- **Conflict Prevention**: Enhanced admin validation prevents registry cross-contamination
+
+### CLI Party Management Tool
+
+Use the `party-mgr.sh` script for easy party management. For detailed CLI documentation, see [`PARTY_MANAGEMENT_CLI.md`](PARTY_MANAGEMENT_CLI.md).
+
+```bash
+# Make the script executable (first time only)
+chmod +x party-mgr.sh
+
+# Initialize the party registry
+./party-mgr.sh init
+
+# Add new parties
+./party-mgr.sh add Alice
+./party-mgr.sh add Bob
+./party-mgr.sh add TokenOwner
+
+# List all registered parties
+./party-mgr.sh list
+
+# Check if a party is registered
+./party-mgr.sh check Alice
+
+# Remove a party from registry
+./party-mgr.sh remove Bob
+
+# Run full demonstration
+./party-mgr.sh demo
+
+# Show help
+./party-mgr.sh help
+```
+
+### Script Configuration
+
+The script connects to a local Daml ledger by default:
+
+- **Host**: `localhost`
+- **Port**: `6865`
+- **DAR File**: `.daml/dist/exchange-0.0.1.dar`
+
+To modify these settings, edit the configuration section in `party-mgr.sh`:
+
+```bash
+# Configuration
+HOST="localhost"
+PORT="6865"
+DAR_FILE=".daml/dist/exchange-0.0.1.dar"
+```
+
+### Manual Party Management with CLI Scripts
+
+You can also manage parties directly using Daml Script commands (after uploading the DAR):
+
+```bash
+# Upload DAR to ledger (if not already done)
+daml ledger upload-dar .daml/dist/exchange-0.0.1.dar
+
+# Initialize registry
+daml script --dar .daml/dist/exchange-0.0.1.dar --script-name Scripts.PartyManagement:cmdInit
+
+# Add parties
+daml script --dar .daml/dist/exchange-0.0.1.dar --script-name Scripts.PartyManagement:cmdAddParty --input-file <(echo '"Alice"')
+daml script --dar .daml/dist/exchange-0.0.1.dar --script-name Scripts.PartyManagement:cmdAddParty --input-file <(echo '"Bob"')
+
+# List all registered parties
+daml script --dar .daml/dist/exchange-0.0.1.dar --script-name Scripts.PartyManagement:cmdListParties
+
+# Check registration status
+daml script --dar .daml/dist/exchange-0.0.1.dar --script-name Scripts.PartyManagement:cmdCheckParty --input-file <(echo '"Alice"')
+
+# Remove a party
+daml script --dar .daml/dist/exchange-0.0.1.dar --script-name Scripts.PartyManagement:cmdRemoveParty --input-file <(echo '"Bob"')
+```
+
+#### Technical Implementation Highlights
+
+**Curried Function Examples:**
+
+```haskell
+-- Old imperative style:
+getPartyByName name = do
+  partyDetails <- getPartyDetailsByName name
+  case partyDetails of
+    Some partyDetails -> return (Some partyDetails.party)
+    None -> return None
+
+-- New curried style (cleaner and more functional):
+getPartyByName name = fmap (fmap (.party)) (getPartyDetailsByName name)
+
+-- Admin party lookup using composition:
+getAdminParty = fmap (fmap (.party)) (getPartyDetailsByName "Admin")
+```
+
+**Enhanced Registry Validation:**
+
+```haskell
+findExistingRegistryInternal expectedAdmin = do
+  optRegistries <- queryContractKey @PartyRegistry expectedAdmin expectedAdmin
+  case optRegistries of
+    Some (registryCid, registry) ->
+      if registry.admin == expectedAdmin
+      then return (Some (registryCid, registry))
+      else logMismatchAndReturnNone
+```
+
+### Integration with Token System
+
+Before using the token system, ensure parties are registered:
+
+1. **Build and Upload**: `daml build && daml ledger upload-dar .daml/dist/exchange-0.0.1.dar`
+2. **Initialize Registry**: `./party-mgr.sh init`
+3. **Register Token Owner**: `./party-mgr.sh add TokenOwner`
+4. **Register Token Holders**: `./party-mgr.sh add Alice`, `./party-mgr.sh add Bob`
+5. **Verify Registration**: `./party-mgr.sh list`
+
+Then proceed with token operations using registered parties only.
 
 ## Integration Notes
 
@@ -231,4 +381,4 @@ For enterprise deployment:
 
 ## License
 
-This template is provided as-is for educational and development purposes. 
+This template is provided as-is for educational and development purposes.

@@ -1,0 +1,45 @@
+module Registry.PartyRegistry where
+
+
+template PartyRegistry
+  with
+    admin : Party
+    registeredParties : [Party]
+  where
+    signatory admin
+    observer registeredParties
+
+    key admin : Party
+    maintainer key
+
+    choice RegisterParty : ContractId PartyRegistry
+      with
+        newParty : Party
+      controller admin
+      do
+        assertMsg "Party already registered" (newParty `notElem` registeredParties)
+        create this with
+          registeredParties = registeredParties ++ [newParty]
+
+    choice UnregisterParty : ContractId PartyRegistry
+      with
+        partyToRemove : Party
+      controller admin
+      do
+        assertMsg "Party not registered" (partyToRemove `elem` registeredParties)
+        create this with
+          registeredParties = filter (/= partyToRemove) registeredParties
+
+    nonconsuming choice ListParties : [Party]
+      controller admin
+      do
+        return registeredParties
+
+    nonconsuming choice IsPartyRegistered : Bool
+      with
+        party : Party
+        requester : Party
+      controller requester
+      do
+        assertMsg "Only registered parties can check registration status" (requester `elem` registeredParties)
+        return (party `elem` registeredParties) 
