@@ -1,0 +1,119 @@
+module Test.TokenPairTest where
+
+import Daml.Script
+import Currency.TokenLedger
+import Currency.TokenMetadata
+import Exchange.TokenPair
+import Registry.PartyRegistry
+-- import DA.Time
+-- import DA.Optional
+
+tokenPairTest : Script ()
+tokenPairTest = script do
+  -- Party setup
+  admin <- allocateParty "Admin"
+  lp <- allocateParty "LiquidityProvider"
+  btcOwner <- allocateParty "BtcOwner"
+  usdtOwner <- allocateParty "UsdtOwner"
+
+  -- Registry setup
+  registryCid <- submit admin do
+    createCmd PartyRegistry with
+      admin = admin
+      registeredParties = [admin, lp, btcOwner, usdtOwner]
+
+  now <- getTime
+  -- Token setup
+  let
+    btcMetadata = TokenMetadata with
+      symbol = "BTC"
+      name = "Bitcoin"
+      description = "Decentralized digital currency"
+      decimals = 8
+      issuedDate = now
+      version = "1.0"
+
+    usdtMetadata = TokenMetadata with
+      symbol = "USDT"
+      name = "Tether"
+      description = "Stablecoin pegged to USD"
+      decimals = 6
+      issuedDate = now
+      version = "1.0"
+
+  -- Initializing BTC and USDT tokens
+  btcSetupCid <- submit btcOwner do
+    createCmd TokenSetup with owner = btcOwner, initialSupply = 100.0, metadata = btcMetadata, registry = registryCid
+  (btcMasterCid, btcLedgerCid) <- submit btcOwner do
+    exerciseCmd btcSetupCid Initialize
+
+  usdtSetupCid <- submit usdtOwner do
+    createCmd TokenSetup with owner = usdtOwner, initialSupply = 1000000.0, metadata = usdtMetadata, registry = registryCid
+  (usdtMasterCid, usdtLedgerCid) <- submit usdtOwner do
+    exerciseCmd usdtSetupCid Initialize
+
+  -- Create token pair
+  let
+    btcMasterKey = (btcOwner, btcMetadata.symbol)
+    usdtMasterKey = (usdtOwner, usdtMetadata.symbol)
+
+  tokenPairSetupCid <- submit admin do
+    createCmd TokenPairSetup with 
+      admin = admin
+      liquidityProvider = lp
+      inputToken = btcMasterCid
+      quoteToken = usdtMasterCid
+  tokenPairCid <- submit admin do
+    exerciseCmd tokenPairSetupCid CreateTokenPair with sellingPrice = 103500.0, buyingPrice = 103000.0
+  
+  -- Mint and burn tokens
+  (newBtcMasterCid, newBtcLedgerCid) <- submit btcOwner do 
+    exerciseCmd btcMasterCid Mint with amount = 10.0
+  (newUsdtMasterCid, newUsdtLedgerCid) <- submit usdtOwner do 
+    exerciseCmd usdtMasterCid Mint with amount = 50000.0
+  
+  -- Burn some of the newly minted tokens
+  (finalBtcMasterCid, _) <- submit btcOwner do 
+    exerciseCmd newBtcMasterCid Burn with tokenCid = newBtcLedgerCid, amountToBurn = Some 5.0
+  (finalUsdtMasterCid, _) <- submit usdtOwner do 
+    exerciseCmd newUsdtMasterCid Burn with tokenCid = newUsdtLedgerCid, amountToBurn = Some 10000.0
+  
+  -- Validate token pair state after mint/burn operations
+  tokenPairData <- submit admin do exerciseCmd tokenPairCid GetData
+  assert (tokenPairData.inputToken == btcMasterCid)
+  assert (tokenPairData.quoteToken == usdtMasterCid)
+  assert (tokenPairData.inputTokenKey == btcMasterKey)
+  assert (tokenPairData.quoteTokenKey == usdtMasterKey)
+
+  -- Test choices
+  (sellingPrice, buyingPrice) <- submit admin do exerciseCmd tokenPairCid GetRate
+  assert (sellingPrice == 103500.0 && buyingPrice == 103000.0)
+
+  lpOnChain <- submit admin do exerciseCmd tokenPairCid GetLiquidityProvider
+  assert (lpOnChain == lp)
+
+  updatedTokenPairCid <- submit admin do
+    exerciseCmd tokenPairCid SetRate with newSellingPrice = 104000.0, newBuyingPrice = 103500.0
+
+  (newSellingPrice, newBuyingPrice) <- submit admin do exerciseCmd updatedTokenPairCid GetRate
+  assert (newSellingPrice == 104000.0 && newBuyingPrice == 103500.0)
+
+  -- Suggestion for other test cases:
+  -- 1. Edge cases for SetRate:
+  --    - Setting buyingPrice equal to sellingPrice.
+  --    - Attempting to set buyingPrice greater than sellingPrice (should fail).
+  --    - Attempting to set non-positive prices (should fail).
+  --
+  -- 2. Abnormal cases for TokenPair creation:
+  --    - Using the same token for both input and quote (should fail).
+  --    - Unauthorized party attempting to create a TokenPair (should fail).
+  --
+  -- 3. Authorization tests for choices:
+  --    - Unauthorized party attempting to call SetRate (should fail).
+  --    - Any party other than admin or liquidityProvider calling GetRate (should fail, if not intended).
+  --
+  -- 4. State validation after complex interactions:
+  --    - After multiple SetRate calls, verify the final rates are correct.
+  --    - After creating multiple token pairs, ensure they do not interfere with each other.
+
+  return () 

@@ -1,0 +1,98 @@
+module Exchange.TokenPair where
+
+import Currency.TokenLedger
+-- import Currency.TokenMetadata
+
+data TokenPairData = TokenPairData
+  with
+    admin: Party
+    liquidityProvider: Party
+    inputToken: ContractId TokenMaster
+    quoteToken: ContractId TokenMaster
+    inputTokenKey: (Party, Text)
+    quoteTokenKey: (Party, Text)
+    sellingPrice: Decimal
+    buyingPrice: Decimal
+  deriving (Eq, Show)
+
+template TokenPair
+  with
+    admin: Party
+    liquidityProvider: Party
+    inputToken: ContractId TokenMaster
+    quoteToken: ContractId TokenMaster
+    inputTokenKey: (Party, Text)
+    quoteTokenKey: (Party, Text)
+    sellingPrice: Decimal
+    buyingPrice: Decimal
+  where
+    signatory admin
+    observer liquidityProvider
+
+    key (admin, inputTokenKey, quoteTokenKey) : (Party, (Party, Text), (Party, Text))
+    maintainer key._1
+
+    ensure inputTokenKey /= quoteTokenKey
+      && sellingPrice > 0.0
+      && buyingPrice > 0.0
+      && sellingPrice >= buyingPrice
+
+    nonconsuming choice GetRate : (Decimal, Decimal)
+      controller admin, liquidityProvider
+      do
+        return (sellingPrice, buyingPrice)
+
+    nonconsuming choice GetLiquidityProvider : Party
+      controller admin, liquidityProvider
+      do
+        return liquidityProvider
+
+    nonconsuming choice GetData : TokenPairData
+      controller admin, liquidityProvider
+      do
+        return TokenPairData with
+          admin = admin
+          liquidityProvider = liquidityProvider
+          inputToken = inputToken
+          quoteToken = quoteToken
+          inputTokenKey = inputTokenKey
+          quoteTokenKey = quoteTokenKey
+          sellingPrice = sellingPrice
+          buyingPrice = buyingPrice
+
+    choice SetRate : ContractId TokenPair
+      with
+        newSellingPrice: Decimal
+        newBuyingPrice: Decimal
+      controller admin
+      do
+        assertMsg "Selling price must be positive" (newSellingPrice > 0.0)
+        assertMsg "Buying price must be positive" (newBuyingPrice > 0.0)
+        assertMsg "Selling price must be greater than or equal to buying price" (newSellingPrice >= newBuyingPrice)
+        create this with
+          sellingPrice = newSellingPrice
+          buyingPrice = newBuyingPrice
+
+template TokenPairSetup
+  with
+    admin: Party
+    liquidityProvider: Party
+    inputToken: ContractId TokenMaster
+    quoteToken: ContractId TokenMaster
+  where
+    signatory admin
+    observer liquidityProvider
+
+    choice CreateTokenPair : ContractId TokenPair
+      with
+        sellingPrice: Decimal
+        buyingPrice: Decimal
+      controller admin
+      do
+        inputTokenContract <- fetch inputToken
+        quoteTokenContract <- fetch quoteToken
+        
+        create TokenPair with
+          inputTokenKey = (inputTokenContract.owner, inputTokenContract.metadata.symbol)
+          quoteTokenKey = (quoteTokenContract.owner, quoteTokenContract.metadata.symbol)
+          ..

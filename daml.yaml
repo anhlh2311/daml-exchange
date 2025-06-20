@@ -7,3 +7,9 @@ dependencies:
   - daml-prim
   - daml-stdlib
   - daml-script
+tests:
+  - Main:main
+  - Test.PartyManagementTest:partyManagementTest
+  - Test.PartyRegistryTest:partyRegistryTest
+  - Test.TokenLedgerTest:tokenLedgerTest
+  - Test.TokenPairTest:tokenPairTest

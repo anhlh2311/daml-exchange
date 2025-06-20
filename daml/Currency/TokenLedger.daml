@@ -100,6 +100,8 @@ template TokenMaster
     registry : ContractId PartyRegistry
   where
     signatory owner
+    key (owner, metadata.symbol) : (Party, Text)
+    maintainer key._1
     -- No observers needed - PartyRegistry handles access control
 
     choice Mint : (ContractId TokenMaster, ContractId TokenLedger)
