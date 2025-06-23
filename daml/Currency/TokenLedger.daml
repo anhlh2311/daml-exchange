@@ -51,7 +51,6 @@ template TokenLedger
           -- Update the current token contract's balance (holder unchanged)
           create this with
             amount = amount - transferAmount
-            -- Remove general observers for privacy - only target and owner can see their balance
 
           -- Return the new token contract
           return targetTokenCid

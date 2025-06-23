@@ -1,0 +1,18 @@
+module Exchange.TokenListing where
+
+import Currency.TokenLedger
+import Registry.PartyRegistry
+
+template TokenListing
+  with
+    tokenOwner: Party
+    admin: Party
+    tokenMasterKey: (Party, Text)
+    tokenMasterCid: ContractId TokenMaster
+    registry: ContractId PartyRegistry
+  where
+    signatory tokenOwner
+    observer admin
+
+    key (tokenOwner, admin, tokenMasterKey) : (Party, Party, (Party, Text))
+    maintainer key._1 

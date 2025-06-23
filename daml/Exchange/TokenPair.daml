@@ -1,6 +1,9 @@
 module Exchange.TokenPair where
 
 import Currency.TokenLedger
+import Exchange.TokenListing
+import Registry.PartyRegistry
+import Registry.PartyRegistryUtils
 -- import Currency.TokenMetadata
 
 data TokenPairData = TokenPairData
@@ -13,6 +16,9 @@ data TokenPairData = TokenPairData
     quoteTokenKey: (Party, Text)
     sellingPrice: Decimal
     buyingPrice: Decimal
+    inputListingCid: ContractId TokenListing
+    quoteListingCid: ContractId TokenListing
+    registry: ContractId PartyRegistry
   deriving (Eq, Show)
 
 template TokenPair
@@ -25,6 +31,9 @@ template TokenPair
     quoteTokenKey: (Party, Text)
     sellingPrice: Decimal
     buyingPrice: Decimal
+    inputListingCid: ContractId TokenListing
+    quoteListingCid: ContractId TokenListing
+    registry: ContractId PartyRegistry
   where
     signatory admin
     observer liquidityProvider
@@ -33,23 +42,34 @@ template TokenPair
     maintainer key._1
 
     ensure inputTokenKey /= quoteTokenKey
+      && inputListingCid /= quoteListingCid
       && sellingPrice > 0.0
       && buyingPrice > 0.0
       && sellingPrice >= buyingPrice
 
     nonconsuming choice GetRate : (Decimal, Decimal)
-      controller admin, liquidityProvider
+      with actor: Party
+      controller actor
       do
+        ensurePartyIsRegistered registry actor actor
+        assert (actor == admin || actor == liquidityProvider)
         return (sellingPrice, buyingPrice)
 
     nonconsuming choice GetLiquidityProvider : Party
-      controller admin, liquidityProvider
+      with actor: Party
+      controller actor
       do
+        -- Check that the exercise actor is registered
+        ensurePartyIsRegistered registry actor actor
+        assert (actor == admin || actor == liquidityProvider)
         return liquidityProvider
 
     nonconsuming choice GetData : TokenPairData
-      controller admin, liquidityProvider
+      with actor: Party
+      controller actor
       do
+        ensurePartyIsRegistered registry actor actor
+        assert (actor == admin || actor == liquidityProvider)
         return TokenPairData with
           admin = admin
           liquidityProvider = liquidityProvider
@@ -59,6 +79,9 @@ template TokenPair
           quoteTokenKey = quoteTokenKey
           sellingPrice = sellingPrice
           buyingPrice = buyingPrice
+          inputListingCid = inputListingCid
+          quoteListingCid = quoteListingCid
+          registry = registry
 
     choice SetRate : ContractId TokenPair
       with
@@ -66,6 +89,7 @@ template TokenPair
         newBuyingPrice: Decimal
       controller admin
       do
+        ensurePartyIsRegistered registry admin admin
         assertMsg "Selling price must be positive" (newSellingPrice > 0.0)
         assertMsg "Buying price must be positive" (newBuyingPrice > 0.0)
         assertMsg "Selling price must be greater than or equal to buying price" (newSellingPrice >= newBuyingPrice)
@@ -77,22 +101,33 @@ template TokenPairSetup
   with
     admin: Party
     liquidityProvider: Party
-    inputToken: ContractId TokenMaster
-    quoteToken: ContractId TokenMaster
+    inputListingCid: ContractId TokenListing
+    quoteListingCid: ContractId TokenListing
+    registry: ContractId PartyRegistry
   where
     signatory admin
     observer liquidityProvider
 
+    ensure inputListingCid /= quoteListingCid
+    
     choice CreateTokenPair : ContractId TokenPair
       with
         sellingPrice: Decimal
         buyingPrice: Decimal
       controller admin
       do
-        inputTokenContract <- fetch inputToken
-        quoteTokenContract <- fetch quoteToken
+        -- Check that all participating parties are registered
+        ensurePartyIsRegistered registry admin liquidityProvider
+        
+        inputListing <- fetch inputListingCid
+        ensurePartyIsRegistered registry admin inputListing.tokenOwner
+
+        quoteListing <- fetch quoteListingCid
+        ensurePartyIsRegistered registry admin quoteListing.tokenOwner
         
         create TokenPair with
-          inputTokenKey = (inputTokenContract.owner, inputTokenContract.metadata.symbol)
-          quoteTokenKey = (quoteTokenContract.owner, quoteTokenContract.metadata.symbol)
+          inputToken = inputListing.tokenMasterCid
+          quoteToken = quoteListing.tokenMasterCid
+          inputTokenKey = inputListing.tokenMasterKey
+          quoteTokenKey = quoteListing.tokenMasterKey
           ..

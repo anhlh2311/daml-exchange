@@ -1,0 +1,10 @@
+module Registry.PartyRegistryUtils where
+
+import Registry.PartyRegistry
+
+ensurePartyIsRegistered: ContractId PartyRegistry -> Party -> Party -> Update ()
+ensurePartyIsRegistered registry requester party = do
+  isRegistered <- exercise registry IsPartyRegistered with 
+    requester
+    party
+  assertMsg "Party is not registered" isRegistered 

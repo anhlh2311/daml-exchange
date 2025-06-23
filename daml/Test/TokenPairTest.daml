@@ -4,9 +4,9 @@ import Daml.Script
 import Currency.TokenLedger
 import Currency.TokenMetadata
 import Exchange.TokenPair
+import Exchange.TokenListing
 import Registry.PartyRegistry
--- import DA.Time
--- import DA.Optional
+import DA.Optional (fromSome)
 
 tokenPairTest : Script ()
 tokenPairTest = script do
@@ -52,68 +52,202 @@ tokenPairTest = script do
   (usdtMasterCid, usdtLedgerCid) <- submit usdtOwner do
     exerciseCmd usdtSetupCid Initialize
 
-  -- Create token pair
+  -- Create token listings
   let
     btcMasterKey = (btcOwner, btcMetadata.symbol)
     usdtMasterKey = (usdtOwner, usdtMetadata.symbol)
 
+  btcListingCid <- submit btcOwner do
+    createCmd TokenListing with
+      tokenOwner = btcOwner
+      admin = admin
+      registry = registryCid
+      tokenMasterKey = btcMasterKey
+      tokenMasterCid = btcMasterCid
+
+  usdtListingCid <- submit usdtOwner do
+    createCmd TokenListing with
+      tokenOwner = usdtOwner
+      admin = admin
+      registry = registryCid
+      tokenMasterKey = usdtMasterKey
+      tokenMasterCid = usdtMasterCid
+
+  -- Create token pair using listings
   tokenPairSetupCid <- submit admin do
-    createCmd TokenPairSetup with 
+    createCmd TokenPairSetup with
       admin = admin
       liquidityProvider = lp
-      inputToken = btcMasterCid
-      quoteToken = usdtMasterCid
+      inputListingCid = btcListingCid
+      quoteListingCid = usdtListingCid
+      registry = registryCid
   tokenPairCid <- submit admin do
     exerciseCmd tokenPairSetupCid CreateTokenPair with sellingPrice = 103500.0, buyingPrice = 103000.0
-  
+
   -- Mint and burn tokens
-  (newBtcMasterCid, newBtcLedgerCid) <- submit btcOwner do 
+  (newBtcMasterCid, newBtcLedgerCid) <- submit btcOwner do
     exerciseCmd btcMasterCid Mint with amount = 10.0
-  (newUsdtMasterCid, newUsdtLedgerCid) <- submit usdtOwner do 
+  (newUsdtMasterCid, newUsdtLedgerCid) <- submit usdtOwner do
     exerciseCmd usdtMasterCid Mint with amount = 50000.0
-  
+
   -- Burn some of the newly minted tokens
-  (finalBtcMasterCid, _) <- submit btcOwner do 
+  (finalBtcMasterCid, _) <- submit btcOwner do
     exerciseCmd newBtcMasterCid Burn with tokenCid = newBtcLedgerCid, amountToBurn = Some 5.0
-  (finalUsdtMasterCid, _) <- submit usdtOwner do 
+  (finalUsdtMasterCid, _) <- submit usdtOwner do
     exerciseCmd newUsdtMasterCid Burn with tokenCid = newUsdtLedgerCid, amountToBurn = Some 10000.0
-  
+
   -- Validate token pair state after mint/burn operations
-  tokenPairData <- submit admin do exerciseCmd tokenPairCid GetData
+  tokenPairData <- submit admin do exerciseCmd tokenPairCid GetData with actor = admin
   assert (tokenPairData.inputToken == btcMasterCid)
   assert (tokenPairData.quoteToken == usdtMasterCid)
   assert (tokenPairData.inputTokenKey == btcMasterKey)
   assert (tokenPairData.quoteTokenKey == usdtMasterKey)
+  assert (tokenPairData.inputListingCid == btcListingCid)
+  assert (tokenPairData.quoteListingCid == usdtListingCid)
 
   -- Test choices
-  (sellingPrice, buyingPrice) <- submit admin do exerciseCmd tokenPairCid GetRate
+  (sellingPrice, buyingPrice) <- submit admin do exerciseCmd tokenPairCid GetRate with actor = admin
   assert (sellingPrice == 103500.0 && buyingPrice == 103000.0)
 
-  lpOnChain <- submit admin do exerciseCmd tokenPairCid GetLiquidityProvider
-  assert (lpOnChain == lp)
+  lpInLedger <- submit admin do exerciseCmd tokenPairCid GetLiquidityProvider with actor = admin
+  assert (lpInLedger == lp)
 
   updatedTokenPairCid <- submit admin do
-    exerciseCmd tokenPairCid SetRate with newSellingPrice = 104000.0, newBuyingPrice = 103500.0
+    exerciseCmd tokenPairCid SetRate with
+      newSellingPrice = 104000.0
+      newBuyingPrice = 103500.0
 
-  (newSellingPrice, newBuyingPrice) <- submit admin do exerciseCmd updatedTokenPairCid GetRate
+  (newSellingPrice, newBuyingPrice) <- submit admin do 
+    exerciseCmd updatedTokenPairCid GetRate with actor = admin
   assert (newSellingPrice == 104000.0 && newBuyingPrice == 103500.0)
 
-  -- Suggestion for other test cases:
+  -- Other test cases:
   -- 1. Edge cases for SetRate:
-  --    - Setting buyingPrice equal to sellingPrice.
-  --    - Attempting to set buyingPrice greater than sellingPrice (should fail).
-  --    - Attempting to set non-positive prices (should fail).
+  --  
+  -- Setting buying price equal to selling price should succeed
+  debug "Setting buying price equal to selling price"
+  tokenPairSetRateEqualCid <- submit admin do
+    exerciseCmd updatedTokenPairCid SetRate with
+      newSellingPrice = 104000.0
+      newBuyingPrice = 104000.0
+
+  -- Verify that the rates are set correctly
+  debug "Verifying that the rates are set correctly"
+  (newSellingPrice, newBuyingPrice) <- submit admin do
+    exerciseCmd tokenPairSetRateEqualCid GetRate with actor = admin
+  assert (newSellingPrice == 104000.0 && newBuyingPrice == 104000.0)
+  debug $ "New selling price: " <> show newSellingPrice
+  debug $ "New buying price: " <> show newBuyingPrice
+
+  -- Setting buying price greater than selling price should fail
+  debug "Setting buying price greater than selling price should fail"
+  tokenPairSetRateBuyingPriceGreaterThanSellingPriceCid <- submitMustFail admin do
+    exerciseCmd tokenPairSetRateEqualCid SetRate with
+      newSellingPrice = 104000.0
+      newBuyingPrice = 105000.0
+
+  -- Setting non-positive prices should fail
+  debug "Setting non-positive prices should fail"
+  tokenPairSetRateNonPositiveSellingPriceCid <- submitMustFail admin do
+    exerciseCmd tokenPairSetRateEqualCid SetRate with
+      newSellingPrice = 0.0
+      newBuyingPrice = 104000.0
+
+  debug "Setting non-positive buying price should fail"
+  tokenPairSetRateNonPositiveBuyingPriceCid <- submitMustFail admin do
+    exerciseCmd tokenPairSetRateEqualCid SetRate with
+      newSellingPrice = 104000.0
+      newBuyingPrice = 0.0
+
   --
   -- 2. Abnormal cases for TokenPair creation:
-  --    - Using the same token for both input and quote (should fail).
-  --    - Unauthorized party attempting to create a TokenPair (should fail).
   --
+  -- Using the same token for both input and quote should fail
+  debug "Using the same token for both input and quote should fail"
+  tokenPairSetRateSameTokenCid <- submitMustFail admin do
+    createCmd TokenPairSetup with
+      admin
+      liquidityProvider = lp
+      inputListingCid = btcListingCid
+      quoteListingCid = btcListingCid
+      registry = registryCid
+
+  -- Unauthorized party attempting to create a TokenPair should fail
+  debug "Unauthorized party attempting to create a TokenPair should fail"
+  tokenPairSetRateUnauthorizedPartyCid <- submitMustFail lp do
+    createCmd TokenPairSetup with
+      admin
+      liquidityProvider = lp
+      inputListingCid = btcListingCid
+      quoteListingCid = usdtListingCid
+      registry = registryCid
+
+-- Fetch the active token pair contract id
+  activeBTCUSDTTokenPairOpt <- queryContractKey @TokenPair admin (admin, btcMasterKey, usdtMasterKey)
+  let activeBTCUSDTTokenPairCid = (fromSome activeBTCUSDTTokenPairOpt)._1
+  debug $ "Active BTC/USDT token pair contract id: " <> show activeBTCUSDTTokenPairCid
+  
+  -- Get the data of the active token pair
+  tokenPairData <- submit admin do exerciseCmd activeBTCUSDTTokenPairCid GetData with actor = admin
+  debug $ "Token pair data: " <> show tokenPairData
+
   -- 3. Authorization tests for choices:
-  --    - Unauthorized party attempting to call SetRate (should fail).
-  --    - Any party other than admin or liquidityProvider calling GetRate (should fail, if not intended).
+  -- Unauthorized party attempting to call SetRate should fail.
+  debug "Unauthorized party attempting to call SetRate should fail"
+  submitMustFail lp do
+    exerciseCmd activeBTCUSDTTokenPairCid SetRate with
+      newSellingPrice = 104000.0
+      newBuyingPrice = 104000.0
+
+  -- Any party other than admin or liquidityProvider calling GetRate should fail, if not intended.
+  debug "Any party other than admin or liquidityProvider calling GetRate should fail, if not intended."
+  debug "Getting rate with admin or liquidityProvider should succeed"
+  (sellingPrice, buyingPrice) <- submit admin do
+    exerciseCmd activeBTCUSDTTokenPairCid GetRate with actor = admin
+  assert (sellingPrice == 104000.0 && buyingPrice == 104000.0)
+
+  (sellingPrice, buyingPrice) <- submit lp do
+    exerciseCmd activeBTCUSDTTokenPairCid GetRate with actor = lp
+  assert (sellingPrice == 104000.0 && buyingPrice == 104000.0)
+
+  unauthorizedParty <- allocateParty "UnauthorizedParty"
+  submitMustFail unauthorizedParty do
+    exerciseCmd activeBTCUSDTTokenPairCid GetRate with actor = unauthorizedParty
+
+  -- Unauthorized party attempting to call GetLiquidityProvider should fail
+  debug "Unauthorized party attempting to call GetLiquidityProvider should fail"
+  submitMustFail unauthorizedParty do
+    exerciseCmd activeBTCUSDTTokenPairCid GetLiquidityProvider with actor = unauthorizedParty
+  
   --
   -- 4. State validation after complex interactions:
-  --    - After multiple SetRate calls, verify the final rates are correct.
-  --    - After creating multiple token pairs, ensure they do not interfere with each other.
+  -- After multiple SetRate calls, verify the final rates are correct.
+  debug "After multiple SetRate calls, verify the final rates are correct."
+  tokenPairSetRateCid00 <- submit admin do
+    exerciseCmd activeBTCUSDTTokenPairCid SetRate with
+      newSellingPrice = 104000.0
+      newBuyingPrice = 103000.0
+
+  tokenPairSetRateCid01 <- submit admin do
+    exerciseCmd tokenPairSetRateCid00 SetRate with
+      newSellingPrice = 104000.0
+      newBuyingPrice = 103500.0
+
+  tokenPairSetRateCid02 <- submit admin do
+    exerciseCmd tokenPairSetRateCid01 SetRate with
+      newSellingPrice = 105000.0
+      newBuyingPrice = 104000.0
+
+  tokenPairSetRateCid03 <- submit admin do
+    exerciseCmd tokenPairSetRateCid02 SetRate with
+      newSellingPrice = 106000.0
+      newBuyingPrice = 105000.0
+  
+  (newSellingPrice, newBuyingPrice) <- submit admin do
+    exerciseCmd tokenPairSetRateCid03 GetRate with actor = admin
+  assert (newSellingPrice == 106000.0 && newBuyingPrice == 105000.0)
+  
+  -- After creating multiple token pairs, ensure they do not interfere with each other.
+ 
 
   return () 
