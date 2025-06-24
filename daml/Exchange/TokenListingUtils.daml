@@ -1,0 +1,16 @@
+module Exchange.TokenListingUtils where
+
+import DA.Optional
+import Exchange.TokenListing
+
+ensureListingsAreActive: Party -> (Party, Text) -> (Party, Text) -> Update ()
+ensureListingsAreActive admin inputMasterKey quoteMasterKey = do
+  let inputListingKey = (inputMasterKey._1, admin, inputMasterKey)
+  inputListingOpt <- lookupByKey @TokenListing inputListingKey
+  assertMsg ("Input token " <> inputMasterKey._2 <> " is no longer listed.") (isSome inputListingOpt)
+
+  let quoteListingKey = (quoteMasterKey._1, admin, quoteMasterKey)
+  quoteListingOpt <- lookupByKey @TokenListing quoteListingKey
+  assertMsg ("Quote token " <> quoteMasterKey._2 <> " is no longer listed.") (isSome quoteListingOpt)
+
+  return ()

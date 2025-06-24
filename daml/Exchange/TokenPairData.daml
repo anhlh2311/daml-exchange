@@ -1,0 +1,18 @@
+module Exchange.TokenPairData where
+
+import Currency.TokenLedger
+import Exchange.TokenListing
+import Registry.PartyRegistry
+
+data TokenPairData = TokenPairData
+  with
+    admin: Party
+    liquidityProvider: Party
+    inputToken: ContractId TokenMaster
+    quoteToken: ContractId TokenMaster
+    inputTokenKey: (Party, Text)
+    quoteTokenKey: (Party, Text)
+    sellingPrice: Decimal
+    buyingPrice: Decimal
+    registry: ContractId PartyRegistry
+  deriving (Eq, Show)
