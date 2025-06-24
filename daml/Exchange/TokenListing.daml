@@ -11,8 +11,12 @@ template TokenListing
     tokenMasterCid: ContractId TokenMaster
     registry: ContractId PartyRegistry
   where
-    signatory tokenOwner
-    observer admin
+    signatory tokenOwner, admin
 
     key (tokenOwner, admin, tokenMasterKey) : (Party, Party, (Party, Text))
-    maintainer key._1 
+    maintainer key._2
+
+    choice Unlist : ()
+      controller tokenOwner
+      do
+        pure () 
