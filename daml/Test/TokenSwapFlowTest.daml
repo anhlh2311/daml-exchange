@@ -1,0 +1,70 @@
+module Test.TokenSwapFlowTest where
+
+import Daml.Script
+import DA.Optional
+import Currency.TokenLedger
+import Exchange.TokenSwap
+import Exchange.TokenPair
+import Exchange.TokenListing
+import Exchange.TokenListingUtils
+import Exchange.TokenPairData
+import Currency.TokenMetadata
+
+import Scripts.PartyManagement
+import Scripts.PartyUtils
+import Test.Fixtures
+
+tokenSwapFlowTest = do
+   -- Registry setup & party registration
+  registryCid <- initializeRegistry
+  adminOpt <- getAdminParty
+  let admin = fromSome adminOpt
+  [alice, bob, lp, btcOwner, usdtOwner] <- allocateAndRegisterParties admin ["Alice", "Bob", "LiquidityProvider", "BtcOwner", "UsdtOwner"]
+
+  -- Token setup
+  btcMetadata <- createMetadata "Bitcoin" "BTC" "Decentralized digital currency" 8
+  usdtMetadata <- createMetadata "Tether" "USDT" "Stablecoin pegged to USD" 6
+
+  -- Initializing BTC and USDT tokens
+  (btcMasterCid, btcOwnerLedgerCid) <- createToken 
+    btcOwner btcMetadata 100.0 admin
+
+  (usdtMasterCid, usdtOwnerLedgerCid) <- createToken 
+    usdtOwner usdtMetadata 1000000000.0 admin
+
+  -- Fund Alice and Liquidity Provider
+  -- create USDT TokenTransferLock for Alice
+  aliceTokenTransferLockCid <- createTokenTransferLock usdtOwner alice usdtOwnerLedgerCid 200000.0
+
+  -- create BTC TokenTransferLock for Liquidity Provider
+  lpTokenTransferLockCid <- createTokenTransferLock btcOwner lp btcOwnerLedgerCid 10.0
+
+  -- Accept the TokenTransferLock for Alice
+  aliceTokenLedgerCid <- acceptTokenTransfer alice aliceTokenTransferLockCid
+
+  -- Accept the TokenTransferLock for Liquidity Provider
+  lpTokenLedgerCid <- acceptTokenTransfer lp lpTokenTransferLockCid
+
+  -- Create token listings
+  let
+    btcMasterKey = (btcOwner, btcMetadata.symbol)
+    usdtMasterKey = (usdtOwner, usdtMetadata.symbol)
+
+  -- create token listing
+  (btcListingCid, btcListingKey) <- createTokenListing btcOwner admin btcMetadata.symbol admin
+
+  (usdtListingCid, usdtListingKey) <- createTokenListing usdtOwner admin usdtMetadata.symbol admin
+
+  -- Create token pair using listings
+  tokenPairSetupCid <- createTokenPairSetup admin lp btcMasterKey usdtMasterKey admin
+
+  -- Create a token pair using listings
+  tokenPairCid <- createTokenPairWithSetup admin tokenPairSetupCid 103500.0 103000.0 admin
+
+  return ()
+   
+   
+   
+   
+
+    

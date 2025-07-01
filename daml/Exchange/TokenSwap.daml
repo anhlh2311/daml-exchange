@@ -1,0 +1,148 @@
+module Exchange.TokenSwap where
+
+import Registry.PartyRegistryUtils
+import Currency.TokenLedger
+import Exchange.TokenPair
+-- import Exchange.TokenPairData
+
+-- Swap Request: User wants to swap tokens using a TokenPair
+template SwapRequest
+  with
+    swapper: Party -- The party initiating the swap
+    admin: Party -- Exchange admin
+    liquidityProvider: Party -- LP providing liquidity
+    tokenPairKey: (Party, (Party, Text), (Party, Text)) -- Key to identify the TokenPair
+    inputAmount: Decimal -- Amount of input token to swap
+    expectedOutputAmount: Decimal -- Minimum expected output amount
+    inputTokenLockCid: ContractId TokenTransferLock -- Locked input tokens
+    registryKey: Party
+  where
+    signatory swapper
+    observer admin, liquidityProvider
+
+    key (swapper, tokenPairKey) : (Party, (Party, (Party, Text), (Party, Text)))
+    maintainer key._1
+
+    ensure inputAmount > 0.0 && expectedOutputAmount > 0.0
+
+    choice ExecuteSwap : (ContractId TokenLedger, ContractId TokenLedger)
+      with
+        outputTokenLockCid: ContractId TokenTransferLock -- LP's locked output tokens
+      controller liquidityProvider
+      do
+        ensurePartyIsRegistered registryKey liquidityProvider liquidityProvider
+
+        -- Fetch the TokenPair to get current rates
+        (tokenPairCid, tokenPair) <- fetchByKey @TokenPair tokenPairKey
+        
+        -- Validate the swap amounts against current rates
+        let calculatedOutput = inputAmount * tokenPair.sellingPrice
+        assertMsg "Output amount below minimum expected" (calculatedOutput >= expectedOutputAmount)
+
+        -- Fetch and validate the locked tokens
+        inputLock <- fetch inputTokenLockCid
+        outputLock <- fetch outputTokenLockCid
+
+        -- Validate input lock
+        assertMsg "Input lock recipient mismatch" (inputLock.recipient == liquidityProvider)
+        assertMsg "Input lock amount mismatch" (inputLock.amount == inputAmount)
+        assertMsg "Input token type mismatch" (inputLock.symbol == (snd tokenPair.inputTokenKey))
+
+        -- Validate output lock  
+        assertMsg "Output lock recipient mismatch" (outputLock.recipient == swapper)
+        assertMsg "Output lock amount insufficient" (outputLock.amount >= expectedOutputAmount)
+        assertMsg "Output token type mismatch" (outputLock.symbol == (snd tokenPair.quoteTokenKey))
+
+        -- Execute the swap by accepting both locks
+        swapperTokens <- exercise outputTokenLockCid Accept
+        lpTokens <- exercise inputTokenLockCid Accept
+
+        return (swapperTokens, lpTokens)
+
+    choice CancelSwap : ContractId TokenLedger
+      controller swapper
+      do
+        ensurePartyIsRegistered registryKey swapper swapper
+        
+        -- Cancel the input token lock to return tokens to swapper
+        exercise inputTokenLockCid Cancel
+
+    choice RejectSwap : ()
+      controller liquidityProvider
+      do
+        ensurePartyIsRegistered registryKey liquidityProvider liquidityProvider
+        
+        -- LP rejects the swap, swapper can cancel to get tokens back
+        archive self
+
+
+-- Liquidity Provider Response: LP locks their tokens for the swap
+template LiquidityResponse
+  with
+    liquidityProvider: Party
+    swapper: Party
+    admin: Party
+    swapRequestCid: ContractId SwapRequest
+    outputTokenLockCid: ContractId TokenTransferLock
+    registryKey: Party
+  where
+    signatory liquidityProvider
+    observer swapper, admin
+
+    choice ConfirmSwap : (ContractId TokenLedger, ContractId TokenLedger)
+      controller swapper
+      do
+        ensurePartyIsRegistered registryKey swapper swapper
+        
+        -- Execute the swap through the original request
+        exercise swapRequestCid ExecuteSwap with
+          outputTokenLockCid = outputTokenLockCid
+
+
+-- Helper template for creating swap requests with proper token locking
+template SwapSetup
+  with
+    swapper: Party
+    admin: Party
+    liquidityProvider: Party
+    inputTokenLedgerCid: ContractId TokenLedger
+    tokenPairKey: (Party, (Party, Text), (Party, Text))
+    inputAmount: Decimal
+    expectedOutputAmount: Decimal
+    registryKey: Party
+  where
+    signatory swapper
+    observer admin, liquidityProvider
+
+    choice InitiateSwap : ContractId SwapRequest
+      controller swapper
+      do
+        ensurePartyIsRegistered registryKey swapper swapper
+
+        -- Fetch the TokenPair to validate it exists and get LP
+        (tokenPairCid, tokenPair) <- fetchByKey @TokenPair tokenPairKey
+        
+        -- Lock the input tokens for the LP
+        (inputTokenLockCid, remainingTokensCid) <- exercise inputTokenLedgerCid LockTokenForTransfer with
+          recipient = liquidityProvider
+          transferAmount = inputAmount
+
+        -- Create the swap request
+        create SwapRequest with
+          inputTokenLockCid = inputTokenLockCid
+          ..
+
+
+-- Utility functions for swap calculations
+calculateSwapOutput : Decimal -> Decimal -> Decimal
+calculateSwapOutput inputAmount sellingPrice = inputAmount * sellingPrice
+
+calculateSwapInput : Decimal -> Decimal -> Decimal  
+calculateSwapInput outputAmount buyingPrice = outputAmount / buyingPrice
+
+-- Swap validation helper
+validateSwapAmounts : Decimal -> Decimal -> Decimal -> Decimal -> Bool
+validateSwapAmounts inputAmount outputAmount sellingPrice buyingPrice =
+  let calculatedOutput = calculateSwapOutput inputAmount sellingPrice
+      calculatedInput = calculateSwapInput outputAmount buyingPrice
+  in calculatedOutput >= outputAmount && calculatedInput <= inputAmount 
