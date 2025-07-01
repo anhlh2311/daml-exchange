@@ -1,0 +1,81 @@
+module Test.Fixtures where
+
+import Daml.Script
+
+import Currency.TokenLedger
+import Currency.TokenMetadata
+import Exchange.TokenListing
+import Exchange.TokenPair
+
+-- Create a token with a given owner, metadata, initial supply, and registry key
+createToken: Party -> TokenMetadata -> Decimal -> Party -> Script (ContractId TokenMaster, ContractId TokenLedger)
+createToken owner metadata initialSupply registryKey = do
+  tokenSetupCid <- submit owner do
+    createCmd TokenSetup with
+      owner = owner
+      initialSupply
+      metadata
+      registryKey
+
+  (tokenMasterCid, tokenLedgerCid) <- submit owner do
+      exerciseCmd tokenSetupCid Initialize
+  
+  return (tokenMasterCid, tokenLedgerCid)
+
+-- Create a listing request for a token with a given owner, admin, symbol, and registry key
+createTokenListingRequest: Party -> Party -> Text -> Party -> Script (ContractId ListingRequest)
+createTokenListingRequest tokenOwner admin symbol registryKey = do
+  let tokenMasterKey = (tokenOwner, symbol)
+
+  submit tokenOwner do
+    createCmd ListingRequest { tokenOwner, admin, tokenMasterKey, registryKey }
+
+-- Create a token listing for a token with a given owner, admin, symbol, and registry key
+createTokenListing: Party -> Party -> Text -> Party -> Script (ContractId TokenListing, (Party, (Party, Text)))
+createTokenListing tokenOwner admin symbol registryKey = do
+  listingRequestCid <- createTokenListingRequest tokenOwner admin symbol registryKey
+
+  let tokenListingKey = (admin, (tokenOwner, symbol))
+  tokenListingCid <- submit admin do
+    exerciseCmd listingRequestCid ApproveListing
+
+  return (tokenListingCid, tokenListingKey)
+
+-- Create a token pair setup
+createTokenPairSetup: Party -> Party -> (Party, Text) -> (Party, Text) -> Party -> Script (ContractId TokenPairSetup)
+createTokenPairSetup admin liquidityProvider inputTokenMasterKey quoteTokenMasterKey registryKey = do
+  submit admin do
+    createCmd TokenPairSetup with
+      admin
+      liquidityProvider
+      inputListingKey = (admin, inputTokenMasterKey)
+      quoteListingKey = (admin, quoteTokenMasterKey)
+      registryKey
+
+-- Create a token pair with a given admin, token pair setup, selling price, buying price, and registry key
+createTokenPairWithSetup: Party -> ContractId TokenPairSetup -> Decimal -> Decimal -> Party -> Script (ContractId TokenPair)
+createTokenPairWithSetup admin tokenPairSetupCid sellingPrice buyingPrice registryKey = do
+  submit admin do
+    exerciseCmd tokenPairSetupCid CreateTokenPair with {sellingPrice, buyingPrice}
+
+-- Create a token pair with a given admin, liquidity provider, input token master key, quote token master key, and registry key
+createTokenPair: Party -> Party -> (Party, Text) -> (Party, Text) -> Decimal -> Decimal -> Party -> Script (ContractId TokenPair)
+createTokenPair admin liquidityProvider inputTokenMasterKey quoteTokenMasterKey sellingPrice buyingPrice registryKey = do
+  
+  tokenPairSetupCid <- createTokenPairSetup admin liquidityProvider inputTokenMasterKey quoteTokenMasterKey registryKey
+
+  createTokenPairWithSetup admin tokenPairSetupCid sellingPrice buyingPrice registryKey
+
+createTokenTransferLock: Party -> Party -> ContractId TokenLedger -> Decimal -> Script (ContractId TokenTransferLock)
+createTokenTransferLock sender recipient tokenLedgerCid amount = do
+  (recipientTokenTransferLockCid, _) <-submit sender do
+    exerciseCmd tokenLedgerCid LockTokenForTransfer with
+      recipient
+      transferAmount = amount
+
+  return recipientTokenTransferLockCid
+
+acceptTokenTransfer: Party -> ContractId TokenTransferLock -> Script (ContractId TokenLedger)
+acceptTokenTransfer recipient tokenTransferLockCid = do
+  submit recipient do
+    exerciseCmd tokenTransferLockCid Accept

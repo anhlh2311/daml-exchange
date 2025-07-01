@@ -41,7 +41,7 @@ testTokenLifecycle = do
       owner = owner
       initialSupply = 0.0
       metadata = createSampleMetadata "Tether USD" "USDT"
-      registry = registryCid
+      registryKey = admin
   
   (masterCid, ownerTokenLedgerCid0) <- submit owner do
     exerciseCmd setupCid Initialize
@@ -157,7 +157,7 @@ testBurningAndSupply = do
       owner = owner
       initialSupply = 0.0
       metadata = usdtMetadata
-      registry = registryCid
+      registryKey = admin
 
   (masterCid, ownerLedgerCid) <- submit owner do 
     exerciseCmd setupCid Initialize
@@ -256,7 +256,7 @@ testErrorHandling = do
       owner = owner
       initialSupply = 0.0
       metadata = usdtMeta
-      registry = registryCid
+      registryKey = admin
 
   (masterCid, ownerLedgerCid) <- submit owner do 
     exerciseCmd setupCid Initialize
@@ -380,7 +380,7 @@ testErrorHandling = do
       owner = ownerBtc
       initialSupply = 10.0
       metadata = btcMeta
-      registry = registryCid
+      registryKey = admin
 
   (masterBtcCid, ownerBtcLedgerCid) <- submit ownerBtc do 
     exerciseCmd setupBtcCid Initialize
