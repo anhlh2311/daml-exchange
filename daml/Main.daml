@@ -1,63 +1,51 @@
 module Main where
 
 import Daml.Script
-
--- import Currency.TokenLedger
--- import Currency.TokenMetadata
--- import Currency.PartyRegistry
+import DA.Optional (fromSome)
+import Currency.TokenLedger
+import Currency.TokenMetadata
+import Scripts.PartyManagement
+import Scripts.PartyUtils
 
 setup: Script ()
 setup = do
-    -- allocate parties--
-    -- usdtOwner <- allocatePartyWithHint "USDT Owner" (PartyIdHint "USDTOwner")
-    -- usdcOwner <- allocatePartyWithHint "USDC Owner" (PartyIdHint "USDCOwner")
-    -- admin <- allocatePartyWithHint "Admin" (PartyIdHint "Admin")
-    -- owner <- allocatePartyWithHint "TokenOwner" (PartyIdHint "Owner")
-    -- alice <- allocatePartyWithHint "Holder" (PartyIdHint "Alice")
-    -- bob <- allocatePartyWithHint "Holder" (PartyIdHint "Bob")
-    -- charlie <- allocatePartyWithHint "Holder" (PartyIdHint "Charlie")
+    -- initialize party registry
+    registryCid <- initializeRegistry
+    adminOpt <- getAdminParty
+    let admin = fromSome adminOpt
 
-    -- construct user ids from text strings
-    -- adminId <- validateUserId "Admin"
-    -- ownerId <- validateUserId "Owner"
-    -- usdcOwnerId <- validateUserId "Owner"
-    -- aliceId <- validateUserId "Alice"
-    -- bobId <- validateUserId "Bob"
-    -- charlieId <- validateUserId "Charlie"
+    -- allocate parties
+    usdcOwner <- allocateAndRegisterParty admin "USDCOwner"
+    btcOwner <- allocateAndRegisterParty admin "BTCOwner"
+    liquidityProvider <- allocateAndRegisterParty admin "LiquidityProvider"
+    alice <- allocateAndRegisterParty admin "Alice"
+    bob <- allocateAndRegisterParty admin "Bob"
+    charlie <- allocateAndRegisterParty admin "Charlie"
 
     -- create token metadata
     -- usdtMetadata <- createMetadata "Tether USD" "USDT"
-    -- usdcMetadata <- createMetadata "USD Coin" "USDC"
-
-    -- create user with given rights
-    -- createUser (User adminId (Some admin)) [CanActAs admin]
-    -- createUser (User ownerId (Some owner)) [CanActAs owner]
-    -- createUser (User usdcOwnerId (Some owner)) [CanActAs owner]
-    -- createUser (User aliceId (Some alice)) [CanActAs alice]
-    -- createUser (User bobId (Some bob)) [CanActAs bob]
-    -- createUser (User charlieId (Some charlie)) [CanActAs charlie]
-
-    -- -- Create party registry
-    -- registryCid <- submit admin do
-    --     createCmd PartyRegistry with
-    --         admin = admin
-    --         registeredParties = [admin, owner, alice, bob, charlie]
+    usdcMetadata <- createMetadata "USD Coin" "USDC" "USD COIN" 6
+    btcMetadata <- createMetadata "Bitcoin" "BTC" "Decentralized digital currency" 8
 
     -- -- create token setup
-    -- setupUSDTCid <- submit owner do
-    --     createCmd TokenSetup with
-    --         owner = owner
-    --         initialSupply = 0.0
-    --         metadata = usdtMetadata
-    --         registry = registryCid
+    setupUSDCid <- submit usdcOwner do
+        createCmd TokenSetup with
+            owner = usdcOwner
+            initialSupply = 1000000.00
+            metadata = usdcMetadata
+            registryKey = admin
 
-    -- -- setupUSDCid <- submit owner do
-    -- --     createCmd TokenSetup with
-    -- --         owner = owner
-    -- --         initialSupply = 0.0
-    -- --         metadata = usdcMetadata
-    -- --         observers = [alice, bob, charlie]
+    (usdcMasterCid, usdcTokenLedgerCid) <- submit usdcOwner do
+        exerciseCmd setupUSDCid Initialize
 
-    -- (usdtMasterCid, usdtTokenLedgerCid) <- submit owner do
-    --     exerciseCmd setupUSDTCid Initialize
+    setupBTCid <- submit btcOwner do
+        createCmd TokenSetup with
+            owner = btcOwner
+            initialSupply = 100000.00
+            metadata = btcMetadata
+            registryKey = admin
+
+    (btcMasterCid, btcTokenLedgerCid) <- submit btcOwner do
+        exerciseCmd setupBTCid Initialize
+
     return ()
