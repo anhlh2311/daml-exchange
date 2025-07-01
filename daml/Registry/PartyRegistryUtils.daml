@@ -2,9 +2,15 @@ module Registry.PartyRegistryUtils where
 
 import Registry.PartyRegistry
 
-ensurePartyIsRegistered: ContractId PartyRegistry -> Party -> Party -> Update ()
-ensurePartyIsRegistered registry requester party = do
+getPartyRegistryByKey: Party -> Update (ContractId PartyRegistry)
+getPartyRegistryByKey registryKey = do
+  (registryCid, _) <- fetchByKey @PartyRegistry registryKey
+  return registryCid
+
+ensurePartyIsRegistered: Party -> Party -> Party -> Update ()
+ensurePartyIsRegistered registryKey requester party = do
+  registry <- getPartyRegistryByKey registryKey
   isRegistered <- exercise registry IsPartyRegistered with 
     requester
     party
-  assertMsg "Party is not registered" isRegistered 
+  assertMsg ("Party " <> show party <> " is not registered") isRegistered

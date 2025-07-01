@@ -1,0 +1,18 @@
+module Scripts.TokenPairManagement where
+
+import Daml.Script
+import Exchange.TokenPairData
+
+validateActiveTokenPairs: Party -> (Party, Text) -> Script ()
+validateActiveTokenPairs admin tokenMasterKey = do
+    activeTokenPairs <- queryInterface @ITokenPairKeys admin
+    let activePairsForToken = filter (\(pairCid, pairView) -> 
+          case pairView of
+            Some view -> view.inputTokenKey == tokenMasterKey || view.quoteTokenKey == tokenMasterKey
+            None -> False) activeTokenPairs
+    
+    assertMsg "There are active token pairs for this token" (null activePairsForToken)
+    return ()
+
+
+

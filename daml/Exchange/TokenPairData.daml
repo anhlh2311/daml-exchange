@@ -1,18 +1,24 @@
 module Exchange.TokenPairData where
 
-import Currency.TokenLedger
-import Exchange.TokenListing
-import Registry.PartyRegistry
+-- import Currency.TokenLedger
+-- import Exchange.TokenListing
 
 data TokenPairData = TokenPairData
   with
     admin: Party
     liquidityProvider: Party
-    inputToken: ContractId TokenMaster
-    quoteToken: ContractId TokenMaster
     inputTokenKey: (Party, Text)
     quoteTokenKey: (Party, Text)
     sellingPrice: Decimal
     buyingPrice: Decimal
-    registry: ContractId PartyRegistry
+    registryKey: Party -- The registry key (Party)
   deriving (Eq, Show)
+
+data TokenPairKeyView = TokenPairKeyView
+  with
+    inputTokenKey: (Party, Text)
+    quoteTokenKey: (Party, Text)
+  deriving (Eq, Show)
+
+interface ITokenPairKeys where
+  viewtype TokenPairKeyView
