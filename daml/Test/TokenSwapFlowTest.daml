@@ -1,17 +1,19 @@
 module Test.TokenSwapFlowTest where
 
 import Daml.Script
+import DA.Assert ((===))
 import DA.Optional
-import Currency.TokenLedger
+-- import Currency.TokenLedger
 import Exchange.TokenSwap
 import Exchange.TokenPair
-import Exchange.TokenListing
-import Exchange.TokenListingUtils
-import Exchange.TokenPairData
+-- import Exchange.TokenListing
+-- import Exchange.TokenListingUtils
+-- import Exchange.TokenPairData
 import Currency.TokenMetadata
 
 import Scripts.PartyManagement
 import Scripts.PartyUtils
+import Scripts.TokenPairManagement
 import Test.Fixtures
 
 tokenSwapFlowTest = do
@@ -32,19 +34,6 @@ tokenSwapFlowTest = do
   (usdtMasterCid, usdtOwnerLedgerCid) <- createToken 
     usdtOwner usdtMetadata 1000000000.0 admin
 
-  -- Fund Alice and Liquidity Provider
-  -- create USDT TokenTransferLock for Alice
-  aliceTokenTransferLockCid <- createTokenTransferLock usdtOwner alice usdtOwnerLedgerCid 200000.0
-
-  -- create BTC TokenTransferLock for Liquidity Provider
-  lpTokenTransferLockCid <- createTokenTransferLock btcOwner lp btcOwnerLedgerCid 10.0
-
-  -- Accept the TokenTransferLock for Alice
-  aliceTokenLedgerCid <- acceptTokenTransfer alice aliceTokenTransferLockCid
-
-  -- Accept the TokenTransferLock for Liquidity Provider
-  lpTokenLedgerCid <- acceptTokenTransfer lp lpTokenTransferLockCid
-
   -- Create token listings
   let
     btcMasterKey = (btcOwner, btcMetadata.symbol)
@@ -59,12 +48,40 @@ tokenSwapFlowTest = do
   tokenPairSetupCid <- createTokenPairSetup admin lp btcMasterKey usdtMasterKey admin
 
   -- Create a token pair using listings
-  tokenPairCid <- createTokenPairWithSetup admin tokenPairSetupCid 103500.0 103000.0 admin
+  tokenPairCid <- createTokenPairWithSetup admin tokenPairSetupCid 109512.0 109483.0 admin
 
-  return ()
-   
-   
-   
-   
+  -- Fund Alice and Liquidity Provider
+  -- create USDT TokenTransferLock for Alice
+  aliceTokenTransferLockCid <- createTokenTransferLock usdtOwner alice usdtOwnerLedgerCid 200000.0
 
-    
+  -- create BTC TokenTransferLock for Liquidity Provider
+  lpTokenTransferLockCid <- createTokenTransferLock btcOwner lp btcOwnerLedgerCid 10.0
+
+  -- Accept the TokenTransferLock for Alice
+  aliceTokenLedgerCid <- acceptTokenTransfer alice aliceTokenTransferLockCid
+
+  -- Accept the TokenTransferLock for Liquidity Provider
+  lpTokenLedgerCid <- acceptTokenTransfer lp lpTokenTransferLockCid
+
+  activeBTCUSDTTokenPairOpt <- getActiveTokenPairByKey admin (admin, btcMasterKey, usdtMasterKey)
+  let activeBTCUSDTTokenPairCid = (fromSome activeBTCUSDTTokenPairOpt)
+
+  (sellingPrice, buyingPrice) <- submit alice do
+    exerciseCmd activeBTCUSDTTokenPairCid GetRate with requester = alice
+
+  sellingPrice === 109512.0
+  buyingPrice === 109483.0
+
+  -- Alice wants to buy BTC with 1095.12 USDT
+  let usdtInputAmount: Decimal = 1095.12
+  let btcInputAmount: Decimal = 1.0
+
+  -- Calculate the amount of BTC that Alice will receive when she buys BTC with USDT
+  let estimatedReceivingBtcAmount = calculateSellingAmount usdtInputAmount sellingPrice
+  debug $ "Estimated receiving amount of BTC for " <> show usdtInputAmount <> " USDT: " <> show estimatedReceivingBtcAmount
+
+  -- Calculate the amount of USDT that Alice will receive when she sells BTC for USDT
+  let estimatedReceivingUsdtAmount = calculateBuyingAmount btcInputAmount buyingPrice
+  debug $ "Estimated receiving amount of USDT for " <> show btcInputAmount <> " BTC: " <> show estimatedReceivingUsdtAmount
+
+  return () 
