@@ -134,15 +134,15 @@ template SwapSetup
 
 
 -- Utility functions for swap calculations
-calculateSwapOutput : Decimal -> Decimal -> Decimal
-calculateSwapOutput inputAmount sellingPrice = inputAmount * sellingPrice
+calculateSellingAmount : Decimal -> Decimal -> Decimal
+calculateSellingAmount inputAmount sellingPrice = inputAmount / sellingPrice
 
-calculateSwapInput : Decimal -> Decimal -> Decimal  
-calculateSwapInput outputAmount buyingPrice = outputAmount / buyingPrice
+calculateBuyingAmount : Decimal -> Decimal -> Decimal  
+calculateBuyingAmount outputAmount buyingPrice = outputAmount * buyingPrice
 
 -- Swap validation helper
 validateSwapAmounts : Decimal -> Decimal -> Decimal -> Decimal -> Bool
 validateSwapAmounts inputAmount outputAmount sellingPrice buyingPrice =
-  let calculatedOutput = calculateSwapOutput inputAmount sellingPrice
-      calculatedInput = calculateSwapInput outputAmount buyingPrice
+  let calculatedOutput = calculateSellingAmount inputAmount sellingPrice
+      calculatedInput = calculateBuyingAmount outputAmount buyingPrice
   in calculatedOutput >= outputAmount && calculatedInput <= inputAmount 

@@ -73,15 +73,17 @@ setup = do
         exerciseCmd btcTokenListingRequestCid ApproveListing
 
     -- Create USDC-BTC TokenPair
-    btcUsdcTokenPairCid <- submit admin do
-        createCmd TokenPair with
+    btcUsdcTokenPairSetupCid <- submit admin do
+        createCmd TokenPairSetup with
             admin
             liquidityProvider
-            inputTokenKey = (btcOwner, "BTC")
-            quoteTokenKey = (usdcOwner, "USDC")
+            inputListingKey = (btcOwner, (btcOwner, "BTC"))
+            quoteListingKey = (usdcOwner, (usdcOwner, "USDC"))
+            registryKey = admin
+
+    btcUsdcTokenPairCid <- submit admin do
+        exerciseCmd btcUsdcTokenPairSetupCid CreateTokenPair with
             sellingPrice = 108608.00
             buyingPrice = 108589.00
-            registryKey = admin
-            
 
     return ()

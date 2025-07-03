@@ -219,14 +219,14 @@ daml test --files ./daml/TokenLedgerTest.daml
 
 ## Party Management
 
-The project includes a comprehensive party management system with improved functional programming patterns and modular architecture.
+The project includes a comprehensive party management system with improved functional programming patterns, modular architecture, and automatic contract observer updates.
 
 ### Code Architecture
 
 The party management system is organized into two modules:
 
 - **`Scripts.PartyUtils`**: Core party and user utilities with functional programming patterns
-- **`Scripts.PartyManagement`**: Registry operations and CLI command interface
+- **`Scripts.PartyManagement`**: Registry operations, CLI command interface, and contract observer management
 
 **Key Improvements:**
 
@@ -234,6 +234,8 @@ The party management system is organized into two modules:
 - **Code Separation**: Utility functions separated from business logic for better reusability
 - **Enhanced Type Safety**: Improved admin validation and registry lookup with conflict prevention
 - **Automatic User Creation**: All party creation includes automatic user setup
+- **Contract Observer Updates**: When parties are registered, existing TokenPair and TokenListing contracts are automatically updated to include new observers
+- **Batch Operations**: Support for registering multiple parties efficiently with single contract update
 
 ### Party Registry System
 
@@ -323,6 +325,24 @@ daml script --dar .daml/dist/exchange-0.0.1.dar --script-name Scripts.PartyManag
 
 #### Technical Implementation Highlights
 
+**Enhanced Party Registration with Contract Updates:**
+
+```haskell
+-- Enhanced single party registration
+registerPartyAndUpdateContracts : Party -> Text -> Script Party
+registerPartyAndUpdateContracts admin name = do
+  newParty <- allocateAndRegisterParty admin name
+  updateAllContractsWithNewObservers admin
+  return newParty
+
+-- Efficient batch party registration  
+registerPartiesAndUpdateContracts : Party -> [Text] -> Script [Party]
+registerPartiesAndUpdateContracts admin partyNames = do
+  newParties <- allocateAndRegisterParties admin partyNames
+  updateAllContractsWithNewObservers admin  -- Single update at the end
+  return newParties
+```
+
 **Curried Function Examples:**
 
 ```haskell
@@ -352,6 +372,26 @@ findExistingRegistryInternal expectedAdmin = do
       else logMismatchAndReturnNone
 ```
 
+**Contract Observer Update Process:**
+
+```haskell
+updateAllContractsWithNewObservers : Party -> Script ()
+updateAllContractsWithNewObservers admin = do
+  -- Update TokenPair contracts
+  tokenPairs <- query @TokenPair admin
+  forA_ tokenPairs $ \(tokenPairCid, tokenPair) -> do
+    when (tokenPair.admin == admin) $ do
+      newTokenPairCid <- submit admin do 
+        exerciseCmd tokenPairCid UpdateTokenPairObservers
+  
+  -- Update TokenListing contracts  
+  tokenListings <- query @TokenListing admin
+  forA_ tokenListings $ \(tokenListingCid, tokenListing) -> do
+    when (tokenListing.admin == admin) $ do
+      newTokenListingCid <- submit admin do
+        exerciseCmd tokenListingCid UpdateTokenListingObservers
+```
+
 ### Integration with Token System
 
 Before using the token system, ensure parties are registered:
@@ -359,8 +399,17 @@ Before using the token system, ensure parties are registered:
 1. **Build and Upload**: `daml build && daml ledger upload-dar .daml/dist/exchange-0.0.1.dar`
 2. **Initialize Registry**: `./party-mgr.sh init`
 3. **Register Token Owner**: `./party-mgr.sh add TokenOwner`
-4. **Register Token Holders**: `./party-mgr.sh add Alice`, `./party-mgr.sh add Bob`
+4. **Register Token Holders**: 
+   - Individual: `./party-mgr.sh add Alice`, `./party-mgr.sh add Bob`
+   - Batch: `./party-mgr.sh add-batch Alice,Bob,Charlie,MarketMaker`
 5. **Verify Registration**: `./party-mgr.sh list`
+
+**Contract Observer Benefits:**
+
+- Newly registered parties automatically become observers of existing TokenPair and TokenListing contracts
+- No manual contract updates required after party registration
+- Immediate visibility into exchange opportunities
+- Consistent observer lists across all exchange contracts
 
 Then proceed with token operations using registered parties only.
 
