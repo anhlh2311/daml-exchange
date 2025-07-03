@@ -4,6 +4,8 @@ import Daml.Script
 import DA.Optional (fromSome)
 import Currency.TokenLedger
 import Currency.TokenMetadata
+import Exchange.TokenListing
+import Exchange.TokenPair
 import Scripts.PartyManagement
 import Scripts.PartyUtils
 
@@ -47,5 +49,39 @@ setup = do
 
     (btcMasterCid, btcTokenLedgerCid) <- submit btcOwner do
         exerciseCmd setupBTCid Initialize
+
+    -- create USDC TokenListing 
+    usdcTokenListingRequestCid <- submit usdcOwner do
+        createCmd ListingRequest with
+            tokenOwner = usdcOwner
+            admin = admin
+            tokenMasterKey = (usdcOwner, "USDC")
+            registryKey = admin
+
+    usdcTokenListingCid <- submit admin do
+        exerciseCmd usdcTokenListingRequestCid ApproveListing
+
+    -- create BTC TokenListing 
+    btcTokenListingRequestCid <- submit btcOwner do
+        createCmd ListingRequest with
+            tokenOwner = btcOwner
+            admin = admin
+            tokenMasterKey = (btcOwner, "BTC")
+            registryKey = admin
+
+    btcTokenListingCid <- submit admin do
+        exerciseCmd btcTokenListingRequestCid ApproveListing
+
+    -- Create USDC-BTC TokenPair
+    btcUsdcTokenPairCid <- submit admin do
+        createCmd TokenPair with
+            admin
+            liquidityProvider
+            inputTokenKey = (btcOwner, "BTC")
+            quoteTokenKey = (usdcOwner, "USDC")
+            sellingPrice = 108608.00
+            buyingPrice = 108589.00
+            registryKey = admin
+            
 
     return ()
