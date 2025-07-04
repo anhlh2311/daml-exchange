@@ -1,0 +1,22 @@
+* {
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+.App {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  background-color: #0f172a;
+}
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 24px;
+  width: 100%;
+}
