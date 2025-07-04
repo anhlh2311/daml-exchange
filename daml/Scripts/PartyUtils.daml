@@ -2,6 +2,7 @@ module Scripts.PartyUtils where
 
 import Daml.Script
 import DA.Optional (fromSome)
+import Registry.PartyRegistry
 
 -- Core party query functions
 -- Find party details by name from the list of known parties
@@ -24,16 +25,18 @@ getPartyDisplayName party = do
       return (Some (fromSome partyDetails.displayName))
     None -> return None
 
--- Old implementation - Find party by name from the list of known parties
--- getPartyByName : Text -> Script (Optional Party)
--- getPartyByName name = do
---   partyDetails <- getPartyDetailsByName name
---   case partyDetails of
---     Some partyDetails -> do
---       return (Some partyDetails.party)
---     None -> return None
+-- Check if a party is registered
+isPartyRegistered : Party -> Script Bool
+isPartyRegistered party = do
+  partyDetails <- getPartyDetailsByParty party
+  case partyDetails of
+    Some partyDetails -> do
+      -- read from registry
+      [(registryCid, registry)] <- query @PartyRegistry party
+      return (party `elem` registry.registeredParties)
+    None -> return False
 
--- New implementation - Find party by name from the list of known parties (using currying)
+-- Find party by name from the list of known parties (using currying)
 -- Function Composition:
 --  getPartyDetailsByName name → Script (Optional PartyDetails)
 --  fmap (.party) → Applies .party field access to extract Party from PartyDetails
@@ -117,4 +120,3 @@ getOrCreateParty name = do
       user <- createUserFromParty party
       debug $ "       >> Created user: " <> show user
       return party
-

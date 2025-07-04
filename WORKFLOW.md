@@ -208,33 +208,33 @@ graph TD
 
 #### Core Components
 
-- **SwapSetup**: Helper template for initiating token swaps
 - **SwapRequest**: Manages swap initiation and execution logic
 - **LiquidityResponse**: Handles liquidity provider participation
 - **TokenTransferLock**: Secures tokens during swap process
+- **SwapUtils**: Utility functions for swap calculations and validation
 
 #### Workflow
 
 ##### Swap Initiation
 
-1. **Swapper** creates `SwapSetup` with desired swap parameters
-2. **Swapper** calls `InitiateSwap` which:
+- **Swapper** calls `createSwapWithTokenLocking` utility function which:
    - Validates the TokenPair exists and is active
-   - Locks input tokens via `TokenTransferLock`
-   - Creates `SwapRequest` with swap details and expected output
+   - Locks input tokens via `TokenTransferLock` for the liquidity provider
+   - Creates `SwapRequest` with swap details and expected output amount
 
 ##### Liquidity Provider Response
 
-3. **Liquidity Provider** reviews the `SwapRequest`
-4. **Liquidity Provider** locks output tokens for the swapper
-5. **Liquidity Provider** creates `LiquidityResponse` indicating readiness
+- **Liquidity Provider** reviews the `SwapRequest`
+- **Liquidity Provider** locks output tokens for the swapper via `TokenTransferLock`
+- **Liquidity Provider** creates `LiquidityResponse` with the output token lock
 
 ##### Swap Execution
 
-6. **Swapper** calls `ConfirmSwap` on the `LiquidityResponse`
-7. System validates amounts against current exchange rates
-8. Both token locks are accepted simultaneously
-9. Tokens are distributed to both parties, completing the swap
+- **Swapper** calls `ConfirmSwap` on the `LiquidityResponse`
+- **LiquidityResponse** calls `ExecuteSwap` on the original `SwapRequest`
+- System validates amounts against current exchange rates from the TokenPair
+- Both token locks are accepted simultaneously
+- Tokens are distributed to both parties, completing the swap
 
 ##### Cancellation and Rejection Flows
 
@@ -242,12 +242,18 @@ graph TD
 - **Liquidity Provider** can `RejectSwap` to decline participation
 - All cancellations return tokens to their original holders safely
 
+##### Rate Validation
+
+- Swap amounts are validated against current TokenPair selling/buying prices
+- Expected output is calculated using `calculateSellingAmount` utility
+- Required input is calculated using `calculateBuyingAmount` utility
+
 ##### Diagram
 
 ```mermaid
 graph TD
     %% Swap Initiation
-    S[Swapper] -->|InitiateSwap| SS[SwapSetup]
+    S[Swapper] -->|createSwapWithTokenLocking| SS[SwapUtils]
     SS -->|Validates TokenPair Exists| TP[TokenPair]
     SS -->|Lock Input Tokens| ITL[Input TokenTransferLock]
     SS -->|Create| SR[SwapRequest]
@@ -259,11 +265,11 @@ graph TD
     
     %% Swap Execution
     S -->|ConfirmSwap| LRS
-    LRS -->|ExecuteSwap| SE[Swap Execution]
-    SE -->|Validates Amounts & Rates| TP
-    SE -->|Accept Input Lock| ITL
-    SE -->|Accept Output Lock| OTL
-    SE -->|Complete| CS[Completed Swap]
+    LRS -->|ExecuteSwap| SR
+    SR -->|Validates Amounts & Rates| TP
+    SR -->|Accept Input Lock| ITL
+    SR -->|Accept Output Lock| OTL
+    SR -->|Complete| CS[Completed Swap]
     
     %% Final Token Distribution
     CS -->|Tokens to Swapper| STL[Swapper TokenLedger]
@@ -276,8 +282,13 @@ graph TD
     RSR -->|Swapper Can Cancel| CR
     
     %% Rate Validation
-    TP -->|Provides Current Rates| SE
-    SE -->|Validates Expected Output| TP
+    TP -->|Provides Current Rates| SR
+    SR -->|Validates Expected Output| TP
+    
+    %% Utility Functions
+    SU[SwapUtils] -->|calculateSellingAmount| SR
+    SU -->|calculateBuyingAmount| SR
+    SU -->|validateSwapAmounts| SR
     
     %% Dependencies
     PR[PartyRegistry] -.->|Validates All Parties| SR
@@ -291,9 +302,10 @@ graph TD
     classDef validation fill:#ffeb3b
     classDef success fill:#c8e6c9
     classDef cancel fill:#ffcdd2
+    classDef utility fill:#e8f5e8
     
     class S,LP user
-    class SS,SR,LRS,SE exchange
+    class SS,SR,LRS,SU exchange
     class ITL,OTL,STL,LPTL,CS,TP system
     class STL2,CR,RSR cancel
     class PR,CM,TL validation
@@ -331,6 +343,13 @@ graph TD
 - Token transfers are atomic (lock → accept → ledger update)
 - Maintains system consistency and prevents partial states
 
+### 6. Simplified Swap Workflow
+
+- Direct approach using `SwapRequest` and `LiquidityResponse` templates
+- Utility functions in `SwapUtils` handle complex calculations and validations
+- Streamlined execution flow reduces complexity while maintaining security
+- Rate validation ensures fair pricing based on current TokenPair rates
+
 ## Security Considerations
 
 1. **Registry Validation**: All operations check party registration status
@@ -345,5 +364,9 @@ graph TD
 2. **Token Creation**: Token owners create `TokenMaster` contracts and mint initial supply
 3. **Exchange Listing**: Token owners request listing; admin reviews and approves active tokens
 4. **Trading Infrastructure**: Admin creates trading pairs with initial exchange rates
-5. **Token Trading**: Users initiate swaps, liquidity providers respond, trades execute atomically
+5. **Token Trading**:
+   - Users call `createSwapWithTokenLocking` to initiate swaps
+   - Liquidity providers create `LiquidityResponse` with locked output tokens
+   - Swappers confirm swaps through `ConfirmSwap` choice
+   - Trades execute atomically with rate validation
 6. **Ongoing Management**: Rate updates, token supply management, and system maintenance

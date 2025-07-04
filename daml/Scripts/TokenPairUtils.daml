@@ -1,4 +1,4 @@
-module Scripts.TokenPairManagement where
+module Scripts.TokenPairUtils where
 
 import Daml.Script
 import Exchange.TokenPair

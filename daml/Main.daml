@@ -5,9 +5,9 @@ import DA.Optional (fromSome)
 import Currency.TokenLedger
 import Currency.TokenMetadata
 import Exchange.TokenListing
-import Exchange.TokenPair
 import Scripts.PartyManagement
 import Scripts.PartyUtils
+import Scripts.SetupUtils
 
 setup: Script ()
 setup = do
@@ -72,18 +72,11 @@ setup = do
     btcTokenListingCid <- submit admin do
         exerciseCmd btcTokenListingRequestCid ApproveListing
 
-    -- Create USDC-BTC TokenPair
-    btcUsdcTokenPairSetupCid <- submit admin do
-        createCmd TokenPairSetup with
-            admin
-            liquidityProvider
-            inputListingKey = (btcOwner, (btcOwner, "BTC"))
-            quoteListingKey = (usdcOwner, (usdcOwner, "USDC"))
-            registryKey = admin
+    -- Create USDC-BTC TokenPair using listings
+    btcUsdcTokenPairSetupCid <- createTokenPairSetup admin liquidityProvider (btcOwner, "BTC") (usdcOwner, "USDC") admin
+    
+    debug $ "BTC USDC Token Pair Setup CID: " <> show btcUsdcTokenPairSetupCid
 
-    btcUsdcTokenPairCid <- submit admin do
-        exerciseCmd btcUsdcTokenPairSetupCid CreateTokenPair with
-            sellingPrice = 108608.00
-            buyingPrice = 108589.00
+    btcUsdcTokenPairCid <- createTokenPairWithSetup admin btcUsdcTokenPairSetupCid 108608.00 108589.00 admin
 
     return ()

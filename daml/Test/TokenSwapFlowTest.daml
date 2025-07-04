@@ -3,18 +3,15 @@ module Test.TokenSwapFlowTest where
 import Daml.Script
 import DA.Assert ((===))
 import DA.Optional
--- import Currency.TokenLedger
 import Exchange.TokenSwap
 import Exchange.TokenPair
--- import Exchange.TokenListing
--- import Exchange.TokenListingUtils
--- import Exchange.TokenPairData
 import Currency.TokenMetadata
 
 import Scripts.PartyManagement
 import Scripts.PartyUtils
-import Scripts.TokenPairManagement
-import Test.Fixtures
+import Scripts.TokenPairUtils
+import Scripts.SwapUtils
+import Scripts.SetupUtils
 
 tokenSwapFlowTest = do
    -- Registry setup & party registration
@@ -63,7 +60,9 @@ tokenSwapFlowTest = do
   -- Accept the TokenTransferLock for Liquidity Provider
   lpTokenLedgerCid <- acceptTokenTransfer lp lpTokenTransferLockCid
 
-  activeBTCUSDTTokenPairOpt <- getActiveTokenPairByKey admin (admin, btcMasterKey, usdtMasterKey)
+  let btcUsdtTokenPairKey = (admin, btcMasterKey, usdtMasterKey)
+  
+  activeBTCUSDTTokenPairOpt <- getActiveTokenPairByKey admin btcUsdtTokenPairKey
   let activeBTCUSDTTokenPairCid = (fromSome activeBTCUSDTTokenPairOpt)
 
   (sellingPrice, buyingPrice) <- submit alice do
@@ -84,4 +83,28 @@ tokenSwapFlowTest = do
   let estimatedReceivingUsdtAmount = calculateBuyingAmount btcInputAmount buyingPrice
   debug $ "Estimated receiving amount of USDT for " <> show btcInputAmount <> " BTC: " <> show estimatedReceivingUsdtAmount
 
+
+  -- Alice create a TokenSwapRequest
+  swapRequestCid <- createSwapWithTokenLocking 
+    alice admin lp 
+    (admin, alice) btcUsdtTokenPairKey 
+    usdtInputAmount estimatedReceivingBtcAmount 
+    admin
+
+  [(requestCid, request)] <- query @SwapRequest alice
+  requestCid === swapRequestCid
+  request.swapper === alice
+  request.admin === admin
+  request.liquidityProvider === lp
+  request.tokenPairKey === btcUsdtTokenPairKey
+  request.inputAmount === usdtInputAmount
+  request.expectedOutputAmount === estimatedReceivingBtcAmount
+
+  debug $ "Swap request created: " <> show request
+
+  debug "---------------------------------"
+
+  -- Liquidity Provider accept the SwapRequest
+  -- acceptSwapRequestCid <- submit lp do
+    -- exerciseCmd swapRequest
   return () 
