@@ -3,6 +3,7 @@ module Exchange.TokenSwap where
 import Registry.PartyRegistryUtils
 import Currency.TokenLedger
 import Exchange.TokenPair
+import Exchange.TokenSwapUtils
 -- import Exchange.TokenPairData
 
 -- Swap Request: User wants to swap tokens using a TokenPair
@@ -46,18 +47,22 @@ template SwapRequest
         -- Validate input lock
         assertMsg "Input lock recipient mismatch" (inputLock.recipient == liquidityProvider)
         assertMsg "Input lock amount mismatch" (inputLock.amount == inputAmount)
-        assertMsg "Input token type mismatch" (inputLock.symbol == (snd tokenPair.inputTokenKey))
 
         -- Validate output lock  
         assertMsg "Output lock recipient mismatch" (outputLock.recipient == swapper)
         assertMsg "Output lock amount insufficient" (outputLock.amount >= expectedOutputAmount)
-        assertMsg "Output token type mismatch" (outputLock.symbol == (snd tokenPair.quoteTokenKey))
 
+        let outputAmount = if (inputLock.symbol == (snd tokenPair.inputTokenKey)) 
+            then calculateSellingAmount inputAmount tokenPair.sellingPrice
+            else calculateBuyingAmount inputAmount tokenPair.buyingPrice
+
+        assertMsg "Output amount below minimum expected" (outputAmount >= expectedOutputAmount)
+        
         -- Execute the swap by accepting both locks
-        swapperTokens <- exercise outputTokenLockCid Accept
-        lpTokens <- exercise inputTokenLockCid Accept
+        swapperNewTokenLedgerCid <- exercise outputTokenLockCid Accept
+        lpNewTokenLedgerCid <- exercise inputTokenLockCid Accept
 
-        return (swapperTokens, lpTokens)
+        return (swapperNewTokenLedgerCid, lpNewTokenLedgerCid)
 
     choice CancelSwap : ContractId TokenLedger
       controller swapper

@@ -3,9 +3,11 @@ module Test.TokenSwapFlowTest where
 import Daml.Script
 import DA.Assert ((===))
 import DA.Optional
+import Currency.TokenLedger
+import Currency.TokenMetadata
 import Exchange.TokenSwap
 import Exchange.TokenPair
-import Currency.TokenMetadata
+import Exchange.TokenSwapUtils
 
 import Scripts.PartyManagement
 import Scripts.PartyUtils
@@ -83,13 +85,21 @@ tokenSwapFlowTest = do
   let estimatedReceivingUsdtAmount = calculateBuyingAmount btcInputAmount buyingPrice
   debug $ "Estimated receiving amount of USDT for " <> show btcInputAmount <> " BTC: " <> show estimatedReceivingUsdtAmount
 
+  -- Query the token ledger of Alice before swap
+  debug "---------------------------------"
+  debug "Query the token ledger of Alice before swap"
+  aliceUsdtTokenLedgerOpt <- queryContractKey @TokenLedger alice (usdtOwner, alice)
+  let aliceUsdtTokenLedger = (fromSome aliceUsdtTokenLedgerOpt)._2
+  debug $ "Alice token balance of " <> aliceUsdtTokenLedger.symbol <> " before swap is: " <> show aliceUsdtTokenLedger.amount
+  debug "---------------------------------"
 
   -- Alice create a TokenSwapRequest
   swapRequestCid <- createSwapWithTokenLocking 
     alice admin lp 
-    (admin, alice) btcUsdtTokenPairKey 
+    (usdtOwner, alice) btcUsdtTokenPairKey 
     usdtInputAmount estimatedReceivingBtcAmount 
     admin
+  debug $ "Swap request CID: " <> show swapRequestCid
 
   [(requestCid, request)] <- query @SwapRequest alice
   requestCid === swapRequestCid
@@ -105,6 +115,75 @@ tokenSwapFlowTest = do
   debug "---------------------------------"
 
   -- Liquidity Provider accept the SwapRequest
-  -- acceptSwapRequestCid <- submit lp do
-    -- exerciseCmd swapRequest
+  debug "Liquidity Provider accept the SwapRequest"
+  -- create a liquidity response
+  liquidityResponseCid <- createLiquidityResponse 
+    lp alice admin 
+    swapRequestCid 
+    (btcOwner, lp) 
+    admin
+
+  debug $ "Liquidity response CID: " <> show liquidityResponseCid
+  
+  debug "---------------------------------"
+
+  -- Alice confirm the swap
+  debug "Alice confirm the swap"
+  (aliceBtcTokenLedgerCid, lpUsdtTokenLedgerCid) <- submit alice do
+    exerciseCmd liquidityResponseCid ConfirmSwap
+
+  -- Alice check the BTC token ledger by querying the TokenLedger contract Id returned by the confirmSwap choice
+  aliceBtcTokenLedgerOpt <- queryContractId alice aliceBtcTokenLedgerCid
+  let aliceBtcTokenLedger = (fromSome aliceBtcTokenLedgerOpt)
+  debug $ "Alice token balance of " <> aliceBtcTokenLedger.symbol <> " is: " <> show aliceBtcTokenLedger.amount
+
+  -- Alice check the USDT token ledger
+  aliceUsdtTokenLedgerOpt <- queryContractKey @TokenLedger alice (usdtOwner, alice)
+  let aliceUsdtTokenLedger = (fromSome aliceUsdtTokenLedgerOpt)._2
+  debug $ "Alice token balance of " <> aliceUsdtTokenLedger.symbol <> " is: " <> show aliceUsdtTokenLedger.amount
+
+  -- Liquidity Provider check the USDT token ledger by querying the TokenLedger contract Id returned by the confirmSwap choice
+  lpUsdtTokenLedgerOpt <- queryContractId lp lpUsdtTokenLedgerCid
+  let lpUsdtTokenLedger = (fromSome lpUsdtTokenLedgerOpt)
+  debug $ "Liquidity Provider token balance of " <> lpUsdtTokenLedger.symbol <> " is: " <> show lpUsdtTokenLedger.amount
+
+  -- Liquidity Provider check the BTC token ledger
+  lpBtcTokenLedgerOpt <- queryContractKey @TokenLedger lp (btcOwner, lp)
+  let lpBtcTokenLedger = (fromSome lpBtcTokenLedgerOpt)._2
+  debug $ "Liquidity Provider token balance of " <> lpBtcTokenLedger.symbol <> " is: " <> show lpBtcTokenLedger.amount
+
+  aliceBtcTokenLedger.amount === estimatedReceivingBtcAmount
+  lpUsdtTokenLedger.amount === usdtInputAmount
+  
+  debug "---------------------------------"
+
+  -- Alice create a new swap request with input amount lower than required amount to swap 0.01 BTC
+  debug "Alice create a new swap request with input amount lower than required amount to swap 0.01 BTC"
+  let usdtInputAmount: Decimal = 1085.00
+  let expectedBtcOutputAmount: Decimal = 0.01
+
+  -- create a new swap request
+  swapRequestCid <- createSwapWithTokenLocking 
+    alice admin lp 
+    (usdtOwner, alice) btcUsdtTokenPairKey 
+    usdtInputAmount expectedBtcOutputAmount 
+    admin
+
+  swapRequestOpt <- queryContractId alice swapRequestCid
+  let swapRequest = (fromSome swapRequestOpt)
+  debug $ "Swap request created: " <> show swapRequest
+  debug $ "Input amount: " <> show swapRequest.inputAmount
+  debug $ "Expected output amount: " <> show swapRequest.expectedOutputAmount
+
+  debug "---------------------------------"
+
+  debug "Liquidity Provider accept the swap request"
+  liquidityResponseCid <- createLiquidityResponse 
+    lp alice admin 
+    swapRequestCid 
+    (btcOwner, lp) 
+    admin
+
+  debug $ "Liquidity response CID: " <> show liquidityResponseCid
+  
   return () 
