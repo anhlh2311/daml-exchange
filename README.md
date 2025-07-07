@@ -1,8 +1,138 @@
-# TokenLedger - Daml Fungible Token Template
+# DAML Token Exchange
 
-A robust implementation of a fungible token system in Daml with minting, transfer (with recipient acceptance), and strong privacy guarantees.
+A robust implementation of a fungible token exchange system in DAML with minting, transfer (with recipient acceptance), and strong privacy guarantees.
 
-## Overview
+## Project Overview
+
+This project demonstrates a token exchange platform built with DAML smart contracts, a NestJS backend, and a React frontend (coming soon).
+
+## Architecture
+
+- **DAML Smart Contracts**: Core business logic for token creation, transfer, and exchange
+- **NestJS Backend**: REST API for interacting with the DAML ledger via JSON API
+- **React Frontend**: User interface for token management (coming soon)
+
+## Installation
+
+### Prerequisites
+
+- [DAML SDK](https://docs.daml.com/getting-started/installation.html) (version 2.9.4 or later)
+- Node.js 18 or later (for NestJS backend and React frontend)
+
+### Starting the DAML Ledger
+
+1. Build the DAML project:
+   ```bash
+   cd daml-exchange
+   daml build
+   ```
+
+2. Start the DAML sandbox with the built DAR file:
+   ```bash
+   daml start
+   ```
+   This will start the DAML sandbox on port 7575 (HTTP JSON API) and the ledger API on port 6865.
+
+### Starting the Backend
+
+1. Navigate to the backend directory:
+   ```bash
+   cd backend
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Create a `.env` file based on `.env.example` with the following content:
+   ```
+   DAML_LEDGER_HOST=localhost
+   DAML_LEDGER_PORT=6865
+   DAML_LEDGER_HTTP_PORT=7575
+   JWT_SECRET=your-secret-key
+   PORT=3001
+   NODE_ENV=development
+   ```
+
+4. Start the NestJS application:
+   ```bash
+   npm run start:dev
+   ```
+   The backend will start on port 3001 with context path `/api`.
+
+5. Access the Swagger API documentation at:
+   ```
+   http://localhost:3001/api
+   ```
+
+### Working API Endpoints
+
+The following endpoints are currently working and can be tested via Swagger:
+
+- `GET /api/daml/verify-connection`: Test DAML ledger connection with hardcoded token
+- `GET /api/daml/health`: Check if DAML ledger is accessible
+- `GET /api/daml/ledger-id`: Get the DAML ledger ID
+- `GET /api/tokens/test-template/{templateId}`: Test fetching contracts of any template ID
+
+### Starting the Frontend (Coming Soon)
+
+1. Navigate to the frontend directory:
+   ```bash
+   cd frontend
+   ```
+   
+2. Frontend implementation coming soon.
+
+## Development Notes
+
+### Authentication
+
+The backend currently uses a hardcoded DAML token with the correct ledger ID "sandbox" for authentication with the DAML ledger. This simplifies development and testing. The token includes these claims:
+
+```json
+{
+  "https://daml.com/ledger-api": {
+    "ledgerId": "sandbox",
+    "applicationId": "daml-exchange-backend",
+    "actAs": ["Alice"]
+  }
+}
+```
+
+### Troubleshooting
+
+#### DAML Ledger Connection Issues
+
+If you encounter connection issues with the DAML ledger:
+
+1. Verify the DAML sandbox is running with `daml start`
+2. Check that ports 6865 (Ledger API) and 7575 (HTTP JSON API) are accessible
+3. Use the `/api/daml/verify-connection` endpoint to test connectivity
+4. Ensure the ledger ID in your token matches the actual ledger ID ("sandbox" for local development)
+
+#### Template ID Format
+
+When querying for DAML contracts, ensure template IDs include the package ID prefix:
+
+```
+<package-id>:<module-name>:<entity-name>
+```
+
+For example: `daml-exchange-0.0.1:Main:TokenLedger`
+
+## Next Steps
+
+- Complete implementation of all token endpoints
+- Add proper user authentication and dynamic token generation
+- Develop the React frontend for interacting with tokens
+- Add automated tests for backend endpoints
+
+## Accessing the Application
+
+- **Backend API**: http://localhost:3001/api
+- **Swagger Documentation**: http://localhost:3001/api
+- **DAML Navigator**: http://localhost:7500
 
 This project implements a secure and privacy-preserving currency token system following Daml best practices. The system supports:
 
