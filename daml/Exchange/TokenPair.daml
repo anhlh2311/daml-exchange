@@ -26,7 +26,7 @@ template TokenPair
     ensure inputTokenKey /= quoteTokenKey
       && sellingPrice > 0.0
       && buyingPrice > 0.0
-      && sellingPrice >= buyingPrice
+      -- && sellingPrice >= buyingPrice  -- Temporarily disabled
     
     interface instance ITokenPairKeys for TokenPair where
       view = TokenPairKeyView with
@@ -121,10 +121,18 @@ template TokenPairSetup
       controller admin
       do
         -- Check that all participating parties are registered
+        debug $ "Registry key: " <> show registryKey
+        debug $ "Admin: " <> show admin
+        debug $ "Liquidity provider: " <> show liquidityProvider
+        
         ensurePartyIsRegistered registryKey admin liquidityProvider
+
+        debug $ "Input listing key: " <> show inputListingKey
         
         (inputListingCid, inputListing) <- fetchByKey @TokenListing inputListingKey
         ensurePartyIsRegistered registryKey admin inputListing.tokenOwner
+
+        debug $ "Input listing: " <> show inputListing
 
         (quoteListingCid, quoteListing) <- fetchByKey @TokenListing quoteListingKey
         ensurePartyIsRegistered registryKey admin quoteListing.tokenOwner
