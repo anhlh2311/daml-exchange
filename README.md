@@ -4,13 +4,13 @@ A robust implementation of a fungible token exchange system in DAML with minting
 
 ## Project Overview
 
-This project demonstrates a token exchange platform built with DAML smart contracts, a NestJS backend, and a React frontend (coming soon).
+This project demonstrates a token exchange platform built with DAML smart contracts, a NestJS backend, and a Next.js frontend.
 
 ## Architecture
 
 - **DAML Smart Contracts**: Core business logic for token creation, transfer, and exchange
 - **NestJS Backend**: REST API for interacting with the DAML ledger via JSON API
-- **React Frontend**: User interface for token management (coming soon)
+- **Next.js Frontend**: User interface for token management with Tailwind CSS styling
 
 ## Installation
 
@@ -75,14 +75,29 @@ The following endpoints are currently working and can be tested via Swagger:
 - `GET /api/daml/ledger-id`: Get the DAML ledger ID
 - `GET /api/tokens/test-template/{templateId}`: Test fetching contracts of any template ID
 
-### Starting the Frontend (Coming Soon)
+### Starting the Frontend
 
 1. Navigate to the frontend directory:
    ```bash
    cd frontend
    ```
-   
-2. Frontend implementation coming soon.
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Start the development server:
+   ```bash
+   npm run dev
+   ```
+   The frontend will start on port 3000 and can be accessed at `http://localhost:3000`.
+
+4. For production build:
+   ```bash
+   npm run build
+   npm start
+   ```
 
 ## Development Notes
 
@@ -125,11 +140,12 @@ For example: `daml-exchange-0.0.1:Main:TokenLedger`
 
 - Complete implementation of all token endpoints
 - Add proper user authentication and dynamic token generation
-- Develop the React frontend for interacting with tokens
+- Connect the frontend to the NestJS backend
 - Add automated tests for backend endpoints
 
 ## Accessing the Application
 
+- **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:3001/api
 - **Swagger Documentation**: http://localhost:3001/api
 - **DAML Navigator**: http://localhost:7500
@@ -345,6 +361,43 @@ daml ledger upload-dar .daml/dist/exchange-0.0.1.dar
 
 # Run tests
 daml test --files ./daml/TokenLedgerTest.daml
+```
+
+## Frontend Features
+
+The frontend is built with Next.js and Tailwind CSS, providing a modern and responsive user interface for the DAML token exchange platform.
+
+### Key Features
+
+- **Party Selection**: Dropdown to select different parties (owner, holder, swapper, liquidityProvider, admin)
+- **Dashboard**: Overview of token balances, recent activities, and key statistics
+- **Token Management**: Interface for viewing, transferring, minting, and burning tokens
+- **Exchange Interface**: Token swap functionality with rate display and transaction history
+- **Responsive Design**: Mobile-friendly interface that works across devices
+
+### Technical Implementation
+
+- **Framework**: Next.js with TypeScript
+- **Styling**: Tailwind CSS for utility-first styling
+- **Components**: Modular component architecture with layout, common, and feature-specific components
+- **State Management**: React hooks for local state management
+- **UI Libraries**: Headless UI for accessible components
+
+### Directory Structure
+
+```
+frontend/
+├── app/                  # Next.js app directory with pages
+│   ├── dashboard/        # Dashboard page
+│   ├── tokens/           # Token management page
+│   ├── exchange/         # Exchange interface page
+│   └── layout.tsx        # Root layout component
+├── components/           # Reusable React components
+│   ├── common/           # Common UI components
+│   ├── dashboard/        # Dashboard-specific components
+│   └── layout/           # Layout components (header, footer)
+├── types/                # TypeScript type definitions
+└── public/               # Static assets
 ```
 
 ## Party Management
