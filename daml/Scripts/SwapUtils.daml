@@ -1,0 +1,56 @@
+module Scripts.SwapUtils where
+
+import Daml.Script
+import DA.Optional
+import Currency.TokenLedger
+import Exchange.TokenSwap
+import Exchange.TokenPair
+
+-- Create a swap request with token locking
+createSwapWithTokenLocking: Party -> Party -> Party -> (Party, Party) -> (Party, (Party, Text), (Party, Text)) -> Decimal -> Decimal -> Party -> Script (ContractId SwapRequest)
+createSwapWithTokenLocking swapper admin liquidityProvider inputTokenLedgerKey tokenPairKey inputAmount expectedOutputAmount registryKey = do
+  -- Validate token pair's existence
+  tokenPairOpt <- queryContractKey @TokenPair swapper tokenPairKey
+  let tokenPairCid = (fromSome tokenPairOpt)._1
+
+  -- Fetch the input token ledger
+  inputTokenLedgerOptCid <- queryContractKey @TokenLedger swapper inputTokenLedgerKey
+  let inputTokenLedgerCid = (fromSome inputTokenLedgerOptCid)._1
+
+  -- Lock the input tokens for the LP
+  (inputTokenLockCid, _) <- submit swapper do 
+    exerciseCmd inputTokenLedgerCid LockTokenForTransfer 
+      {
+        recipient = liquidityProvider, 
+        transferAmount = inputAmount
+      }
+
+  -- Create the swap request
+  submit swapper do 
+    createCmd SwapRequest with
+      ..
+
+-- Create a liquidity response with token locking
+createLiquidityResponse: Party -> Party -> Party -> ContractId SwapRequest -> (Party, Party) -> Party -> Script (ContractId LiquidityResponse)
+createLiquidityResponse liquidityProvider swapper admin swapRequestCid liquidityLedgerKey registryKey = do
+  -- Fetch the liquidity ledger
+  liquidityLedgerOpt <- queryContractKey @TokenLedger liquidityProvider liquidityLedgerKey
+  debug $ "Liquidity ledger opt: " <> show liquidityLedgerOpt
+  let liquidityLedgerCid = (fromSome liquidityLedgerOpt)._1
+
+  -- Fetch the swap request
+  swapRequestOpt <- queryContractId liquidityProvider swapRequestCid
+  let swapRequest = (fromSome swapRequestOpt)
+  
+  -- Create token transfer lock
+  (outputTokenLockCid, _) <- submit liquidityProvider do
+    exerciseCmd liquidityLedgerCid LockTokenForTransfer
+      {
+        recipient = swapper,
+        transferAmount = swapRequest.expectedOutputAmount
+      }
+
+  -- create the liquidity response
+  submit liquidityProvider do
+    createCmd LiquidityResponse with
+      ..

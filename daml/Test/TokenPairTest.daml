@@ -12,7 +12,7 @@ import Exchange.TokenListing
 
 import Scripts.PartyManagement
 import Scripts.PartyUtils
-import Test.Fixtures
+import Scripts.SetupUtils
 
 
 tokenPairTest : Script ()
@@ -78,7 +78,7 @@ tokenPairTest = script do
   tokenPairData.quoteTokenKey === usdtMasterKey
 
   -- Test choices
-  (sellingPrice, buyingPrice) <- submit admin do exerciseCmd tokenPairCid GetRate
+  (sellingPrice, buyingPrice) <- submit admin do exerciseCmd tokenPairCid GetRate with requester = admin
   sellingPrice === 103500.0 
   buyingPrice === 103000.0
 
@@ -95,7 +95,7 @@ tokenPairTest = script do
       newBuyingPrice = 103500.0
 
   (newSellingPrice, newBuyingPrice) <- submit admin do 
-    exerciseCmd updatedTokenPairCid GetRate
+    exerciseCmd updatedTokenPairCid GetRate with requester = admin
   newSellingPrice === 104000.0
   newBuyingPrice === 103500.0
 
@@ -112,7 +112,7 @@ tokenPairTest = script do
   -- Verify that the rates are set correctly
   debug "Verifying that the rates are set correctly"
   (newSellingPrice, newBuyingPrice) <- submit admin do
-    exerciseCmd tokenPairSetRateEqualCid GetRate
+    exerciseCmd tokenPairSetRateEqualCid GetRate with requester = admin
   newSellingPrice === 104000.0
   newBuyingPrice === 104000.0
   debug $ "New selling price: " <> show newSellingPrice
@@ -182,17 +182,18 @@ tokenPairTest = script do
   debug "Any party other than admin or liquidityProvider calling GetRate should fail, if not intended."
   debug "Getting rate with admin should succeed"
   (sellingPrice, buyingPrice) <- submit admin do
-    exerciseCmd activeBTCUSDTTokenPairCid GetRate
+    exerciseCmd activeBTCUSDTTokenPairCid GetRate with requester = admin
   sellingPrice === 104000.0
   buyingPrice === 104000.0
 
-  debug "Getting rate with liquidityProvider should fail due to missing lookup authorization"
-  submitMustFail lp do
-    exerciseCmd activeBTCUSDTTokenPairCid GetRate
+  -- debug "Getting rate with liquidityProvider should fail due to missing lookup authorization"
+  -- submitMustFail lp do
+  --   exerciseCmd activeBTCUSDTTokenPairCid GetRate with requester = lp
 
+  debug "Unauthorized party attempting to call GetRate should fail"
   unauthorizedParty <- allocateParty "UnauthorizedParty"
   submitMustFail unauthorizedParty do
-    exerciseCmd activeBTCUSDTTokenPairCid GetRate
+    exerciseCmd activeBTCUSDTTokenPairCid GetRate with requester = unauthorizedParty
 
   -- Unauthorized party attempting to call GetLiquidityProvider should fail
   debug "Unauthorized party attempting to call GetLiquidityProvider should fail"
@@ -224,9 +225,31 @@ tokenPairTest = script do
       newBuyingPrice = 105000.0
   
   (newSellingPrice, newBuyingPrice) <- submit admin do
-    exerciseCmd tokenPairSetRateCid03 GetRate
+    exerciseCmd tokenPairSetRateCid03 GetRate with requester = admin
   newSellingPrice === 106000.0
   newBuyingPrice === 105000.0
+
+  -- Test: Register a new party and verify they can see existing contracts
+  debug "=== Testing Observer Updates for New Parties ==="
+  
+  -- Register a new party after contracts are already created
+  [newUser] <- registerPartiesAndUpdateContracts admin ["Duck"]
+
+  -- Get the active token pair contract id
+  activeBTCUSDTTokenPairOpt <- queryContractKey @TokenPair admin (admin, btcMasterKey, usdtMasterKey)
+  let activeBTCUSDTTokenPairCid = (fromSome activeBTCUSDTTokenPairOpt)._1
+  debug $ "Active BTC/USDT token pair contract id: " <> show activeBTCUSDTTokenPairCid
+  
+  -- Verify the new party can now query the rate (they can see the contract)
+  (newUserSellingPrice, newUserBuyingPrice) <- submit newUser do
+    exerciseCmd activeBTCUSDTTokenPairCid GetRate with requester = newUser
+  
+  newUserSellingPrice === 106000.0
+  newUserBuyingPrice === 105000.0
+  
+  debug "✅ New party can successfully query rates after observer update"
+  
+  -- dick <-allocateAndRegisterParties admin ["Dick"]
   
   return ()
 

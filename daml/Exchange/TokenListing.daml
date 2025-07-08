@@ -8,9 +8,10 @@ template TokenListing
     admin: Party
     tokenMasterKey: (Party, Text)
     registryKey: Party -- The registry key (Party)
+    observers: [Party]
   where
     signatory admin
-    observer tokenOwner
+    observer tokenOwner, observers
 
     key (admin, tokenMasterKey) : (Party, (Party, Text))
     maintainer key._1
@@ -27,6 +28,15 @@ template TokenListing
           tokenMasterKey = tokenMasterKey
           tokenListingCid = self
           registryKey = registryKey
+
+    choice UpdateTokenListingObservers : ContractId TokenListing
+      controller admin
+      do
+        ensurePartyIsRegistered registryKey admin admin
+        (_, registry) <- getPartyRegistryByKey registryKey
+        
+        create this with
+          observers = registry.registeredParties
 
 template ListingRequest
   with
@@ -48,6 +58,8 @@ template ListingRequest
       do
         ensurePartyIsRegistered registryKey admin admin
 
+        (_, registry) <- getPartyRegistryByKey registryKey
+
         -- check if the token is already listed
         let tokenListingKey = (admin, tokenMasterKey)
         tokenListingOpt <- lookupByKey @TokenListing tokenListingKey
@@ -60,6 +72,7 @@ template ListingRequest
           None -> do
             -- create the token listing
             create TokenListing with
+              observers = registry.registeredParties
               ..
 
     choice RejectListing : ()

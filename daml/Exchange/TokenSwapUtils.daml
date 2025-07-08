@@ -1,0 +1,15 @@
+module Exchange.TokenSwapUtils where
+
+-- Utility functions for swap calculations
+calculateSellingAmount : Decimal -> Decimal -> Decimal
+calculateSellingAmount amount sellingPrice = amount / sellingPrice
+
+calculateBuyingAmount : Decimal -> Decimal -> Decimal  
+calculateBuyingAmount amount buyingPrice = amount * buyingPrice
+
+-- Swap validation helper
+validateSwapAmounts : Decimal -> Decimal -> Decimal -> Decimal -> Bool
+validateSwapAmounts inputAmount outputAmount sellingPrice buyingPrice =
+  let calculatedOutput = calculateSellingAmount inputAmount sellingPrice
+      calculatedInput = calculateBuyingAmount outputAmount buyingPrice
+  in calculatedOutput >= outputAmount && calculatedInput <= inputAmount 

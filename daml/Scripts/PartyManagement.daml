@@ -2,7 +2,10 @@ module Scripts.PartyManagement where
 
 import Daml.Script
 import DA.Foldable (forA_)
+import DA.Action
 import Registry.PartyRegistry
+import Exchange.TokenPair
+import Exchange.TokenListing
 import Scripts.PartyUtils
 
 -- Helper function to find any existing registry (using different lookup strategies)
@@ -187,7 +190,8 @@ cmdAddParty name = do
   admin <- getAdminParty
   case admin of
     Some admin -> do
-      _ <- allocateAndRegisterParty admin name
+      -- _ <- allocateAndRegisterParty admin name
+      _ <- registerPartyAndUpdateContracts admin name
       return ()
     None -> do
       debug "   - No admin party found"
@@ -198,7 +202,8 @@ cmdAddParties names = do
   admin <- getAdminParty
   case admin of
     Some admin -> do
-      _ <- allocateAndRegisterParties admin names
+      -- _ <- allocateAndRegisterParties admin names
+      _ <- registerPartiesAndUpdateContracts admin names
       return ()
     None -> do
       debug "   - No admin party found"
@@ -226,3 +231,64 @@ cmdRemoveParty name = do
   admin <- getOrCreateAdminParty
   _ <- removeParty admin name
   return ()
+
+-- Helper function to update all active TokenPairs and TokenListings with new observers
+updateAllContractsWithNewObservers : Party -> Script ()
+updateAllContractsWithNewObservers admin = do
+  debug $ "Updating all contracts with new observers for admin: " <> show admin
+  
+  -- Update all TokenPair contracts
+  tokenPairs <- query @TokenPair admin
+  forA_ tokenPairs $ \(tokenPairCid, tokenPair) -> do
+    when (tokenPair.admin == admin) $ do
+      debug $ "Updating TokenPair: " <> show tokenPairCid
+      newTokenPairCid <- submit admin do exerciseCmd tokenPairCid UpdateTokenPairObservers
+      debug $ "Updated TokenPair: " <> show newTokenPairCid
+    
+   
+    -- if tokenPair.admin == admin then do
+    --   debug $ "Updating TokenPair: " <> show tokenPairCid
+    --   newTokenPairCid <- submit admin do
+    --     exerciseCmd tokenPairCid UpdateTokenPairObservers
+    --   debug $ "Updated TokenPair: " <> show newTokenPairCid
+    -- else
+    --   return ()
+  
+  -- Update all TokenListing contracts  
+  tokenListings <- query @TokenListing admin
+  forA_ tokenListings $ \(tokenListingCid, tokenListing) -> do
+    when (tokenListing.admin == admin) $ do
+      debug $ "Updating TokenListing: " <> show tokenListingCid
+      newTokenListingCid <- submit admin do
+        exerciseCmd tokenListingCid UpdateTokenListingObservers
+      debug $ "Updated TokenListing: " <> show newTokenListingCid
+
+    -- if tokenListing.admin == admin then do
+    --   debug $ "Updating TokenListing: " <> show tokenListingCid
+    --   newTokenListingCid <- submit admin do
+    --     exerciseCmd tokenListingCid UpdateTokenListingObservers
+    --   debug $ "Updated TokenListing: " <> show newTokenListingCid
+    -- else
+    --   return ()
+  
+  debug "All contracts updated with new observers"
+
+-- Enhanced party registration that updates existing contracts
+registerPartyAndUpdateContracts : Party -> Text -> Script Party
+registerPartyAndUpdateContracts admin name = do
+  newParty <- allocateAndRegisterParty admin name
+  updateAllContractsWithNewObservers admin
+  return newParty
+
+-- Enhanced party registration that updates existing contracts
+-- This is a more efficient way to register multiple parties at once
+-- by updating all existing contracts in one go
+registerPartiesAndUpdateContracts : Party -> [Text] -> Script [Party]
+registerPartiesAndUpdateContracts admin partyNames = do
+  -- Register the party normally
+  newParties <- allocateAndRegisterParties admin partyNames
+  
+  -- Then update all existing contracts
+  updateAllContractsWithNewObservers admin
+  
+  return newParties

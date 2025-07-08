@@ -1,4 +1,4 @@
-module Test.Fixtures where
+module Scripts.SetupUtils where
 
 import Daml.Script
 

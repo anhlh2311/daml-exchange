@@ -3,6 +3,7 @@ module Exchange.TokenSwap where
 import Registry.PartyRegistryUtils
 import Currency.TokenLedger
 import Exchange.TokenPair
+import Exchange.TokenSwapUtils
 -- import Exchange.TokenPairData
 
 -- Swap Request: User wants to swap tokens using a TokenPair
@@ -46,18 +47,22 @@ template SwapRequest
         -- Validate input lock
         assertMsg "Input lock recipient mismatch" (inputLock.recipient == liquidityProvider)
         assertMsg "Input lock amount mismatch" (inputLock.amount == inputAmount)
-        assertMsg "Input token type mismatch" (inputLock.symbol == (snd tokenPair.inputTokenKey))
 
         -- Validate output lock  
         assertMsg "Output lock recipient mismatch" (outputLock.recipient == swapper)
         assertMsg "Output lock amount insufficient" (outputLock.amount >= expectedOutputAmount)
-        assertMsg "Output token type mismatch" (outputLock.symbol == (snd tokenPair.quoteTokenKey))
 
+        let outputAmount = if (inputLock.symbol == (snd tokenPair.inputTokenKey)) 
+            then calculateSellingAmount inputAmount tokenPair.sellingPrice
+            else calculateBuyingAmount inputAmount tokenPair.buyingPrice
+
+        assertMsg "Output amount below minimum expected" (outputAmount >= expectedOutputAmount)
+        
         -- Execute the swap by accepting both locks
-        swapperTokens <- exercise outputTokenLockCid Accept
-        lpTokens <- exercise inputTokenLockCid Accept
+        swapperNewTokenLedgerCid <- exercise outputTokenLockCid Accept
+        lpNewTokenLedgerCid <- exercise inputTokenLockCid Accept
 
-        return (swapperTokens, lpTokens)
+        return (swapperNewTokenLedgerCid, lpNewTokenLedgerCid)
 
     choice CancelSwap : ContractId TokenLedger
       controller swapper
@@ -97,52 +102,3 @@ template LiquidityResponse
         -- Execute the swap through the original request
         exercise swapRequestCid ExecuteSwap with
           outputTokenLockCid = outputTokenLockCid
-
-
--- Helper template for creating swap requests with proper token locking
-template SwapSetup
-  with
-    swapper: Party
-    admin: Party
-    liquidityProvider: Party
-    inputTokenLedgerCid: ContractId TokenLedger
-    tokenPairKey: (Party, (Party, Text), (Party, Text))
-    inputAmount: Decimal
-    expectedOutputAmount: Decimal
-    registryKey: Party
-  where
-    signatory swapper
-    observer admin, liquidityProvider
-
-    choice InitiateSwap : ContractId SwapRequest
-      controller swapper
-      do
-        ensurePartyIsRegistered registryKey swapper swapper
-
-        -- Fetch the TokenPair to validate it exists and get LP
-        (tokenPairCid, tokenPair) <- fetchByKey @TokenPair tokenPairKey
-        
-        -- Lock the input tokens for the LP
-        (inputTokenLockCid, remainingTokensCid) <- exercise inputTokenLedgerCid LockTokenForTransfer with
-          recipient = liquidityProvider
-          transferAmount = inputAmount
-
-        -- Create the swap request
-        create SwapRequest with
-          inputTokenLockCid = inputTokenLockCid
-          ..
-
-
--- Utility functions for swap calculations
-calculateSwapOutput : Decimal -> Decimal -> Decimal
-calculateSwapOutput inputAmount sellingPrice = inputAmount * sellingPrice
-
-calculateSwapInput : Decimal -> Decimal -> Decimal  
-calculateSwapInput outputAmount buyingPrice = outputAmount / buyingPrice
-
--- Swap validation helper
-validateSwapAmounts : Decimal -> Decimal -> Decimal -> Decimal -> Bool
-validateSwapAmounts inputAmount outputAmount sellingPrice buyingPrice =
-  let calculatedOutput = calculateSwapOutput inputAmount sellingPrice
-      calculatedInput = calculateSwapInput outputAmount buyingPrice
-  in calculatedOutput >= outputAmount && calculatedInput <= inputAmount 

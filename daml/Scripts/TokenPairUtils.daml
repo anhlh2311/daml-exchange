@@ -1,6 +1,7 @@
-module Scripts.TokenPairManagement where
+module Scripts.TokenPairUtils where
 
 import Daml.Script
+import Exchange.TokenPair
 import Exchange.TokenPairData
 
 validateActiveTokenPairs: Party -> (Party, Text) -> Script ()
@@ -14,5 +15,9 @@ validateActiveTokenPairs admin tokenMasterKey = do
     assertMsg "There are active token pairs for this token" (null activePairsForToken)
     return ()
 
-
-
+getActiveTokenPairByKey: Party -> (Party, (Party, Text), (Party, Text)) -> Script (Optional (ContractId TokenPair))
+getActiveTokenPairByKey requester tokenPairKey = do 
+  activeTokenPairOpt <- queryContractKey @TokenPair requester tokenPairKey
+  case activeTokenPairOpt of
+    Some (activeTokenPairCid, _) -> return (Some activeTokenPairCid)
+    None -> return None
