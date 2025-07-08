@@ -50,7 +50,9 @@ export default function Header() {
                 </div>
               </div>
               <div className="hidden sm:ml-6 sm:flex sm:items-center">
-                <PartySelector />
+                <div className="w-64">
+                  <PartySelector />
+                </div>
               </div>
               <div className="-mr-2 flex items-center sm:hidden">
                 {/* Mobile menu button */}

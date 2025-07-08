@@ -17,15 +17,15 @@ export default function PartySelector() {
       {({ open }) => (
         <>
           <div className="relative mt-1">
-            <Listbox.Button className="relative w-full cursor-default rounded-md bg-white py-1.5 pl-3 pr-10 text-left text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6">
+            <Listbox.Button className="relative w-full cursor-default rounded-md bg-white py-2 pl-4 pr-12 text-left text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-600 text-base leading-6">
               <span className="flex items-center">
-                <span className="h-5 w-5 flex-shrink-0 rounded-full bg-indigo-100 flex items-center justify-center">
-                  <span className="text-xs font-medium text-indigo-600">{selected.displayName[0]}</span>
+                <span className="h-7 w-7 flex-shrink-0 rounded-full bg-indigo-100 flex items-center justify-center">
+                  <span className="text-sm font-medium text-indigo-600">{selected.displayName[0]}</span>
                 </span>
                 <span className="ml-3 block truncate">{selected.displayName}</span>
               </span>
               <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                <ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                <ChevronUpDownIcon className="h-6 w-6 text-gray-400" aria-hidden="true" />
               </span>
             </Listbox.Button>
 
@@ -36,14 +36,14 @@ export default function PartySelector() {
               leaveFrom="opacity-100"
               leaveTo="opacity-0"
             >
-              <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+              <Listbox.Options className="absolute z-10 mt-1 max-h-80 w-64 overflow-auto rounded-md bg-white py-2 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                 {mockParties.map((party) => (
                   <Listbox.Option
                     key={party.id}
                     className={({ active }) =>
                       classNames(
                         active ? 'bg-indigo-600 text-white' : 'text-gray-900',
-                        'relative cursor-default select-none py-2 pl-3 pr-9'
+                        'relative cursor-default select-none py-3 pl-4 pr-9'
                       )
                     }
                     value={party}
@@ -52,11 +52,11 @@ export default function PartySelector() {
                       <>
                         <div className="flex items-center">
                           <span className={classNames(
-                            'h-5 w-5 flex-shrink-0 rounded-full flex items-center justify-center',
+                            'h-7 w-7 flex-shrink-0 rounded-full flex items-center justify-center',
                             active ? 'bg-indigo-300' : 'bg-indigo-100'
                           )}>
                             <span className={classNames(
-                              'text-xs font-medium',
+                              'text-sm font-medium',
                               active ? 'text-white' : 'text-indigo-600'
                             )}>
                               {party.displayName[0]}
@@ -66,7 +66,7 @@ export default function PartySelector() {
                             className={classNames(selected ? 'font-semibold' : 'font-normal', 'ml-3 block truncate')}
                           >
                             {party.displayName}
-                            <span className="ml-2 text-xs text-gray-500">({party.role})</span>
+                            <span className="ml-2 text-sm text-gray-500">({party.role})</span>
                           </span>
                         </div>
 
@@ -77,7 +77,7 @@ export default function PartySelector() {
                               'absolute inset-y-0 right-0 flex items-center pr-4'
                             )}
                           >
-                            <CheckIcon className="h-5 w-5" aria-hidden="true" />
+                            <CheckIcon className="h-6 w-6" aria-hidden="true" />
                           </span>
                         ) : null}
                       </>
