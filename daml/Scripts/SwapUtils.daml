@@ -5,6 +5,7 @@ import DA.Optional
 import Currency.TokenLedger
 import Exchange.TokenSwap
 import Exchange.TokenPair
+import Exchange.TokenSwapUtils
 
 -- Create a swap request with token locking
 createSwapWithTokenLocking: Party -> Party -> Party -> (Party, Party) -> (Party, (Party, Text), (Party, Text)) -> Decimal -> Decimal -> Party -> Script (ContractId SwapRequest)
@@ -12,10 +13,17 @@ createSwapWithTokenLocking swapper admin liquidityProvider inputTokenLedgerKey t
   -- Validate token pair's existence
   tokenPairOpt <- queryContractKey @TokenPair swapper tokenPairKey
   let tokenPairCid = (fromSome tokenPairOpt)._1
+  let tokenPair = (fromSome tokenPairOpt)._2
 
   -- Fetch the input token ledger
   inputTokenLedgerOptCid <- queryContractKey @TokenLedger swapper inputTokenLedgerKey
   let inputTokenLedgerCid = (fromSome inputTokenLedgerOptCid)._1
+  let inputTokenLedger = (fromSome inputTokenLedgerOptCid)._2
+
+  -- Calculate the expected output amount
+  let calculatedOutputAmount = calculateExpectedOutputAmount inputTokenLedger.symbol tokenPair inputAmount
+
+  assertMsg "Output amount below minimum expected" (calculatedOutputAmount >= expectedOutputAmount)
 
   -- Lock the input tokens for the LP
   (inputTokenLockCid, _) <- submit swapper do 

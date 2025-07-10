@@ -36,13 +36,13 @@ template SwapRequest
         -- Fetch the TokenPair to get current rates
         (tokenPairCid, tokenPair) <- fetchByKey @TokenPair tokenPairKey
         
-        -- Validate the swap amounts against current rates
-        let calculatedOutput = inputAmount * tokenPair.sellingPrice
-        assertMsg "Output amount below minimum expected" (calculatedOutput >= expectedOutputAmount)
-
         -- Fetch and validate the locked tokens
         inputLock <- fetch inputTokenLockCid
         outputLock <- fetch outputTokenLockCid
+
+        let calculatedOutputAmount = calculateExpectedOutputAmount inputLock.symbol tokenPair inputAmount
+
+        assertMsg "Output amount below minimum expected" (calculatedOutputAmount >= expectedOutputAmount)
 
         -- Validate input lock
         assertMsg "Input lock recipient mismatch" (inputLock.recipient == liquidityProvider)
@@ -51,12 +51,6 @@ template SwapRequest
         -- Validate output lock  
         assertMsg "Output lock recipient mismatch" (outputLock.recipient == swapper)
         assertMsg "Output lock amount insufficient" (outputLock.amount >= expectedOutputAmount)
-
-        let outputAmount = if (inputLock.symbol == (snd tokenPair.inputTokenKey)) 
-            then calculateSellingAmount inputAmount tokenPair.sellingPrice
-            else calculateBuyingAmount inputAmount tokenPair.buyingPrice
-
-        assertMsg "Output amount below minimum expected" (outputAmount >= expectedOutputAmount)
         
         -- Execute the swap by accepting both locks
         swapperNewTokenLedgerCid <- exercise outputTokenLockCid Accept
