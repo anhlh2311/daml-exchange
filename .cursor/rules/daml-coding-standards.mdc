@@ -1,0 +1,170 @@
+# Daml Coding Standards for Exchange System
+
+## Template Structure
+
+### Required Template Fields
+
+- Always include `registryKey: Party` for admin validation
+- Use descriptive field names with proper types
+- Include `observers` field when multiple parties need visibility
+
+### Choice Design Patterns
+
+#### Two-Step Transfer Pattern
+
+```daml
+-- Step 1: Lock tokens for transfer
+choice LockTokenForTransfer: (ContractId TokenTransferLock, Optional (ContractId TokenLedger))
+  with
+    recipient: Party
+    transferAmount: Decimal
+  controller holder
+  do
+    -- Validation and lock creation
+
+-- Step 2: Accept/Reject by recipient
+choice Accept: ContractId TokenLedger
+  controller recipient
+  do
+    -- Transfer completion
+```
+
+#### Admin-Controlled Operations
+
+```daml
+choice ApproveListing: ContractId TokenListing
+  controller admin
+  do
+    -- Admin validation and approval
+```
+
+### Validation Patterns
+
+#### Party Registration Validation
+
+```daml
+ensurePartyIsRegistered registryKey party
+```
+
+#### Amount Validation
+
+```daml
+assertMsg (amount > 0.0) "Amount must be positive"
+assertMsg (amount <= ledger.amount) "Insufficient balance"
+```
+
+#### Authorization Checks
+
+```daml
+assertMsg (controller == owner) "Only owner can perform this action"
+```
+
+## Privacy and Visibility
+
+### Contract Visibility Rules
+
+- **TokenLedger**: Only holder (signatory) and owner (observer) can see
+- **TokenTransferLock**: Only sender, recipient, and owner can see
+- **TokenListing**: Admin and token owner can see
+- **TokenPair**: All registered parties can observe
+
+### Observer Management
+
+```daml
+observers = [admin, tokenOwner] -- Specific parties
+observers = [] -- No additional observers for privacy
+```
+
+## Error Handling
+
+### Assert Messages
+
+- Use descriptive `assertMsg` messages
+- Include context about what validation failed
+- Reference the specific field that caused the error
+
+### Optional Handling
+
+```daml
+-- Safe unwrapping with validation
+let admin = fromSome adminOpt
+assertMsg (isSome adminOpt) "Admin party not found"
+```
+
+## Metadata and Extensibility
+
+### Token Metadata Structure
+
+```daml
+template TokenMetadata
+  with
+    name: Text
+    symbol: Text
+    description: Text
+    decimals: Int
+```
+
+### Registry Key Pattern
+
+- Use `(Party, Text)` tuples for unique identifiers
+- Example: `(tokenOwner, "USDC")` for token listings
+
+## Testing Patterns
+
+### Test Structure
+
+```daml
+testName: Script ()
+testName = do
+  -- Setup parties and contracts
+  -- Execute test operations
+  -- Verify expected outcomes
+  return ()
+```
+
+### Common Test Utilities
+
+- Use [daml/Scripts/](mdc:daml/Scripts/) for test setup functions
+- Create reusable party allocation functions
+- Use descriptive test names that explain the scenario
+
+## Import Organization
+
+### Standard Imports
+
+```daml
+import Daml.Script
+import DA.Optional (fromSome, isSome)
+import DA.Assert
+```
+
+### Module-Specific Imports
+
+- Import utilities from corresponding Utils modules
+- Import test-specific modules only in test files
+
+## Documentation Standards
+
+### Template Documentation
+
+```daml
+-- | Represents a fungible token balance for a holder
+-- |
+-- | Key Features:
+-- | - Privacy: Only holder and owner can see
+-- | - Validation: Non-negative amounts, sufficient balance
+-- | - Transfer: Two-step lock/accept pattern
+template TokenLedger
+```
+
+### Choice Documentation
+
+```daml
+-- | Initiates a token transfer by locking tokens for a recipient
+-- | Creates a TokenTransferLock contract that must be accepted/rejected
+choice LockTokenForTransfer
+```
+
+description: Coding standards
+globs: *.daml
+---
