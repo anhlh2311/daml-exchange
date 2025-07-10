@@ -70,23 +70,14 @@
 
         .swap-container {
             display: flex;
-            align-items: center;
-            justify-content: space-between;
+            flex-direction: column;
+            gap: 15px;
             margin-bottom: 30px;
             position: relative;
         }
 
         .token-input {
-            flex: 1;
-            margin: 0 20px;
-        }
-
-        .token-input:first-child {
-            margin-left: 0;
-        }
-
-        .token-input:last-child {
-            margin-right: 0;
+            width: 100%;
         }
 
         .token-label {
@@ -129,10 +120,8 @@
         }
 
         .swap-arrow {
-            position: absolute;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
+            position: relative;
+            align-self: center;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
@@ -146,7 +135,7 @@
         }
 
         .swap-arrow:hover {
-            transform: translate(-50%, -50%) scale(1.1);
+            transform: scale(1.1);
             box-shadow: 0 5px 15px rgba(0,0,0,0.3);
         }
 
@@ -224,20 +213,11 @@
 
         @media (max-width: 768px) {
             .swap-container {
-                flex-direction: column;
                 gap: 20px;
             }
 
             .swap-arrow {
-                position: relative;
-                left: auto;
-                top: auto;
-                transform: none;
                 margin: 10px auto;
-            }
-
-            .token-input {
-                margin: 0;
             }
         }
     </style>
@@ -271,7 +251,7 @@
                 </div>
 
                 <button class="swap-arrow" id="swap-direction" onclick="swapTokens()">
-                    ⇄
+                    ⇅
                 </button>
 
                 <div class="token-input">
