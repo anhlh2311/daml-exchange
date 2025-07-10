@@ -273,8 +273,8 @@ flowchart TD
     C --> D[Select Swap Request]
     D --> E[Review Swap Details]
     E --> F{Accept Swap?}
-    F -->|Yes| G[Click "Accept]
-    F -->|No| H[Click "Reject]
+    F -->|Yes| G[Click Accept]
+    F -->|No| H[Click Reject]
     G --> I[Lock Output Tokens]
     H --> J[Reject Swap Request]
     I --> K[Create LiquidityResponse]
