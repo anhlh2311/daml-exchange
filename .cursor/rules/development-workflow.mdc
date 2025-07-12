@@ -1,0 +1,173 @@
+# Development Workflow for Exchange System
+
+## Project Structure Understanding
+
+### Core Components
+
+- **Currency System**: [daml/Currency/](mdc:daml/Currency/) - Token management and transfers
+- **Exchange System**: [daml/Exchange/](mdc:daml/Exchange/) - Trading infrastructure
+- **Registry System**: [daml/Registry/](mdc:daml/Registry/) - Party management
+- **Scripts**: [daml/Scripts/](mdc:daml/Scripts/) - Utilities and setup functions
+- **Tests**: [daml/Test/](mdc:daml/Test/) - Comprehensive test suite
+
+### Key Entry Points
+
+- **Main Setup**: [daml/Main.daml](mdc:daml/Main.daml) - System initialization
+- **Configuration**: [daml.yaml](mdc:daml.yaml) - Project settings
+- **Documentation**: [README.md](mdc:README.md) and [WORKFLOW.md](mdc:WORKFLOW.md)
+
+## Development Process
+
+### 1. Understanding the System
+
+1. Start with [README.md](mdc:README.md) for high-level overview
+2. Review [WORKFLOW.md](mdc:WORKFLOW.md) for detailed workflow documentation
+3. Examine [daml/Main.daml](mdc:daml/Main.daml) to understand system initialization
+4. Study test files in [daml/Test/](mdc:daml/Test/) for usage examples
+
+### 2. Making Changes
+
+1. **Template Modifications**: Update templates in appropriate directories
+2. **Utility Functions**: Add to corresponding Utils files
+3. **Scripts**: Extend [daml/Scripts/](mdc:daml/Scripts/) for new functionality
+4. **Tests**: Add comprehensive tests in [daml/Test/](mdc:daml/Test/)
+
+### 3. Validation Process
+
+1. Run tests: `daml test`
+2. Check for compilation errors: `daml build`
+3. Validate business logic through test scenarios
+4. Ensure party registration validation is maintained
+
+## Common Development Tasks
+
+### Adding New Tokens
+
+1. Create token metadata in [daml/Currency/TokenMetadata.daml](mdc:daml/Currency/TokenMetadata.daml)
+2. Use existing [TokenLedger](mdc:daml/Currency/TokenLedger.daml) templates
+3. Add initialization to [daml/Main.daml](mdc:daml/Main.daml)
+4. Create listing request in [daml/Exchange/TokenListing.daml](mdc:daml/Exchange/TokenListing.daml)
+
+### Creating New Trading Pairs
+
+1. Ensure both tokens are listed in [daml/Exchange/TokenListing.daml](mdc:daml/Exchange/TokenListing.daml)
+2. Use [TokenPairUtils](mdc:daml/Scripts/TokenPairUtils.daml) for pair creation
+3. Add pair setup to [daml/Main.daml](mdc:daml/Main.daml)
+4. Test with [daml/Test/TokenPairTest.daml](mdc:daml/Test/TokenPairTest.daml)
+
+### Extending Swap Functionality
+
+1. Modify [daml/Exchange/TokenSwap.daml](mdc:daml/Exchange/TokenSwap.daml) for new features
+2. Update [daml/Exchange/TokenSwapUtils.daml](mdc:daml/Exchange/TokenSwapUtils.daml) for validation
+3. Add tests in [daml/Test/TokenSwapFlowTest.daml](mdc:daml/Test/TokenSwapFlowTest.daml)
+4. Update [daml/Scripts/SwapUtils.daml](mdc:daml/Scripts/SwapUtils.daml) if needed
+
+## Code Organization Principles
+
+### Template Design
+
+- Keep templates focused on single responsibility
+- Use Utils modules for shared functionality
+- Maintain consistent field naming across templates
+- Include comprehensive documentation
+
+### Script Organization
+
+- Use [daml/Scripts/](mdc:daml/Scripts/) for reusable functions
+- Separate concerns: party management, setup, trading
+- Create utility functions for common operations
+- Maintain clear naming conventions
+
+### Test Strategy
+
+- Unit tests for individual template choices
+- Integration tests for complete workflows
+- Error condition testing for validation
+- Use descriptive test names and comments
+
+## Debugging and Troubleshooting
+
+### Common Issues
+
+1. **Party Registration Errors**: Ensure parties are registered in [PartyRegistry](mdc:daml/Registry/PartyRegistry.daml)
+2. **Balance Validation**: Check sufficient balance before transfers
+3. **Authorization Errors**: Verify controller restrictions on choices
+4. **Privacy Issues**: Check observer configurations
+
+### Debugging Tools
+
+- Use `debug` statements in scripts for logging
+- Run specific test files for focused debugging
+- Check contract visibility and observer configurations
+- Validate party registration status
+
+### Testing Strategy
+
+```bash
+# Run all tests
+daml test
+
+# Run specific component tests
+daml test --files ./daml/Test/TokenLedgerTest.daml
+
+# Build and check for errors
+daml build
+```
+
+## Documentation Standards
+
+### Code Documentation
+
+- Use comprehensive template documentation
+- Document all choices with purpose and parameters
+- Include usage examples in comments
+- Maintain consistent documentation style
+
+### Workflow Documentation
+
+- Update [WORKFLOW.md](mdc:WORKFLOW.md) for new workflows
+- Document business logic changes
+- Maintain clear process descriptions
+- Include sequence diagrams for complex flows
+
+## Performance Considerations
+
+### Contract Efficiency
+
+- Minimize contract complexity
+- Use efficient data structures
+- Avoid unnecessary contract creation
+- Optimize observer configurations
+
+### Testing Performance
+
+- Use focused unit tests for performance-critical code
+- Test with realistic data volumes
+- Monitor contract creation and archival
+- Validate memory usage patterns
+
+## Security Best Practices
+
+### Validation
+
+- Always validate party registration
+- Check authorization for all operations
+- Validate input parameters thoroughly
+- Use descriptive error messages
+
+### Privacy
+
+- Maintain proper observer configurations
+- Ensure only necessary parties can see contracts
+- Validate privacy requirements in tests
+- Document privacy implications
+
+### Access Control
+
+- Use controller restrictions appropriately
+- Validate admin-only operations
+- Check ownership before modifications
+- Implement proper authorization patterns
+description: Development workflow and best practices for the Daml exchange project
+
+---

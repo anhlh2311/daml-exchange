@@ -1,0 +1,204 @@
+# Testing Guidelines for Exchange System
+
+## Test Structure and Organization
+
+### Test File Organization
+
+- All tests are in [daml/Test/](mdc:daml/Test/) directory
+- Each major component has its own test file
+- Tests follow the naming pattern: `ComponentNameTest.daml`
+
+### Test Scripts
+
+- [PartyManagementTest.daml](mdc:daml/Test/PartyManagementTest.daml): Party registration workflows
+- [PartyRegistryTest.daml](mdc:daml/Test/PartyRegistryTest.daml): Registry validation tests
+- [TokenLedgerTest.daml](mdc:daml/Test/TokenLedgerTest.daml): Token lifecycle tests
+- [TokenPairTest.daml](mdc:daml/Test/TokenPairTest.daml): Trading pair tests
+- [TokenSwapFlowTest.daml](mdc:daml/Test/TokenSwapFlowTest.daml): Complete swap workflows
+
+## Test Setup Patterns
+
+### Party Allocation
+
+```daml
+-- Use utility functions from Scripts
+admin <- allocateParty "Admin"
+alice <- allocateParty "Alice"
+bob <- allocateParty "Bob"
+```
+
+### Registry Initialization
+
+```daml
+-- Initialize party registry for all tests
+registryCid <- initializeRegistry
+adminOpt <- getAdminParty
+let admin = fromSome adminOpt
+```
+
+### Token Setup
+
+```daml
+-- Create token metadata
+metadata <- createMetadata "Test Token" "TEST" "Test token for testing" 6
+
+-- Setup token with initial supply
+setupCid <- submit owner do
+  createCmd TokenSetup with
+    owner = owner
+    initialSupply = 1000.0
+    metadata = metadata
+    registryKey = admin
+
+(masterCid, ledgerCid) <- submit owner do
+  exerciseCmd setupCid Initialize
+```
+
+## Test Categories
+
+### 1. Unit Tests
+
+- Test individual template choices
+- Validate input parameters
+- Test error conditions and assertions
+
+### 2. Integration Tests
+
+- Test complete workflows across multiple templates
+- Validate business logic end-to-end
+- Test cross-component interactions
+
+### 3. Workflow Tests
+
+- Test complete user journeys
+- Validate multi-step processes
+- Test error recovery scenarios
+
+## Common Test Patterns
+
+### Token Lifecycle Test
+
+```daml
+tokenLifecycleTest: Script ()
+tokenLifecycleTest = do
+  -- 1. Setup parties and registry
+  -- 2. Create token with metadata
+  -- 3. Mint initial supply
+  -- 4. Test transfers (lock/accept/reject/cancel)
+  -- 5. Test burning (partial and full)
+  -- 6. Verify final states
+```
+
+### Swap Workflow Test
+
+```daml
+swapWorkflowTest: Script ()
+swapWorkflowTest = do
+  -- 1. Setup two tokens and their owners
+  -- 2. Create listings for both tokens
+  -- 3. Create trading pair
+  -- 4. Setup initial balances for traders
+  -- 5. Execute swap
+  -- 6. Verify final balances
+```
+
+### Error Condition Tests
+
+```daml
+insufficientBalanceTest: Script ()
+insufficientBalanceTest = do
+  -- Setup with limited balance
+  -- Attempt transfer exceeding balance
+  -- Verify appropriate error
+```
+
+## Validation Testing
+
+### Party Registration Validation
+
+- Test operations with unregistered parties
+- Verify `ensurePartyIsRegistered` enforcement
+- Test admin-only operations
+
+### Balance Validation
+
+- Test transfers with insufficient balance
+- Test negative amount transfers
+- Test zero amount transfers
+
+### Authorization Testing
+
+- Test operations by unauthorized parties
+- Verify controller restrictions
+- Test observer visibility rules
+
+## Test Utilities
+
+### Reusable Setup Functions
+
+- Use functions from [daml/Scripts/](mdc:daml/Scripts/) for common setup
+- Create test-specific utility functions
+- Maintain consistent party naming across tests
+
+### Assertion Patterns
+
+```daml
+-- Verify contract creation
+assertMsg (isSome contractOpt) "Contract should be created"
+
+-- Verify balance changes
+assertMsg (newBalance == expectedBalance) "Balance should match expected"
+
+-- Verify contract archival
+assertMsg (isNone contractOpt) "Contract should be archived"
+```
+
+## Test Configuration
+
+### daml.yaml Test Configuration
+
+```yaml
+tests:
+  - Test.PartyManagementTest:partyManagementTest
+  - Test.PartyRegistryTest:partyRegistryTest
+  - Test.TokenLedgerTest:tokenLedgerTest
+  - Test.TokenPairTest:tokenPairTest
+  - Test.TokenSwapFlowTest:tokenSwapFlowTest
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+daml test
+
+# Run specific test file
+daml test --files ./daml/Test/TokenLedgerTest.daml
+```
+
+## Test Documentation
+
+### Test Naming
+
+- Use descriptive test names that explain the scenario
+- Follow pattern: `componentActionTest`
+- Include expected outcome in test name
+
+### Test Comments
+
+```daml
+-- | Tests the complete token lifecycle from creation to burning
+-- | Verifies: minting, transfers, and burning operations
+tokenLifecycleTest: Script ()
+```
+
+### Test Organization
+
+- Group related tests together
+- Use clear section comments
+- Maintain logical flow from setup to verification
+
+description: Testing guidelines
+globs: daml/Test/*.daml
+
+---

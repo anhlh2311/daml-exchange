@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Token Swap - Daml Exchange</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .swap-card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+        }
+
+        .swap-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .token-input {
+            width: 100%;
+        }
+
+        .token-label {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .token-select {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            font-size: 1em;
+            background: #f8f9fa;
+            cursor: pointer;
+            transition: border-color 0.3s ease;
+        }
+
+        .token-select:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+        }
+
+        .amount-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            font-size: 1.2em;
+            margin-top: 10px;
+            transition: border-color 0.3s ease;
+        }
+
+        .amount-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .swap-arrow {
+            position: relative;
+            align-self: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.2em;
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+
+        .swap-arrow:hover {
+            transform: scale(1.1);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .rate-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .rate-display {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .slippage-info {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .swap-button {
+            width: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 18px;
+            border-radius: 12px;
+            font-size: 1.2em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .swap-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+        }
+
+        .swap-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .balance-info {
+            background: #e8f5e8;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #155724;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .swap-container {
+                gap: 20px;
+            }
+
+            .swap-arrow {
+                margin: 10px auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <button class="back-btn" onclick="window.location.href='wireframe.html'">← Back</button>
+    
+    <div class="container">
+        <div class="header">
+            <h1>Token Swap</h1>
+            <p>Exchange tokens at current market rates</p>
+        </div>
+
+        <div class="swap-card">
+            <div class="swap-container">
+                <div class="token-input">
+                    <div class="token-label">You Pay</div>
+                    <select class="token-select" id="input-token">
+                        <option value="">Select Token</option>
+                        <option value="BTC">Bitcoin (BTC)</option>
+                        <option value="ETH">Ethereum (ETH)</option>
+                        <option value="USDT">Tether (USDT)</option>
+                        <option value="SOL">Solana (SOL)</option>
+                        <option value="BNB">Binance Coin (BNB)</option>
+                        <option value="ADA">Cardano (ADA)</option>
+                    </select>
+                    <input type="number" class="amount-input" id="input-amount" placeholder="0.00" step="0.000001">
+                    <div class="balance-info" id="input-balance" style="display: none;">
+                        Balance: <span id="input-balance-amount">0.00</span>
+                    </div>
+                </div>
+
+                <button class="swap-arrow" id="swap-direction" onclick="swapTokens()">
+                    ⇅
+                </button>
+
+                <div class="token-input">
+                    <div class="token-label">You Receive</div>
+                    <select class="token-select" id="output-token">
+                        <option value="">Select Token</option>
+                        <option value="BTC">Bitcoin (BTC)</option>
+                        <option value="ETH">Ethereum (ETH)</option>
+                        <option value="USDT">Tether (USDT)</option>
+                        <option value="SOL">Solana (SOL)</option>
+                        <option value="BNB">Binance Coin (BNB)</option>
+                        <option value="ADA">Cardano (ADA)</option>
+                    </select>
+                    <input type="number" class="amount-input" id="output-amount" placeholder="0.00" step="0.000001" readonly>
+                    <div class="balance-info" id="output-balance" style="display: none;">
+                        Balance: <span id="output-balance-amount">0.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rate-info">
+                <div class="rate-display" id="rate-display">Select tokens to see exchange rate</div>
+                <div class="slippage-info">Slippage tolerance: 0.5%</div>
+            </div>
+
+            <button class="swap-button" id="swap-button" disabled onclick="executeSwap()">
+                Connect Wallet to Swap
+            </button>
+
+            <div class="error-message" id="error-message"></div>
+            <div class="success-message" id="success-message"></div>
+        </div>
+    </div>
+
+    <script>
+        // Token data with balances and rates
+        const tokenData = {
+            'BTC': { balance: 2.5, rate: 109512, decimals: 8 },
+            'ETH': { balance: 15.0, rate: 2777, decimals: 18 },
+            'USDT': { balance: 50000, rate: 1, decimals: 6 },
+            'SOL': { balance: 100, rate: 277, decimals: 9 },
+            'BNB': { balance: 5.0, rate: 2727, decimals: 8 },
+            'ADA': { balance: 10000, rate: 1, decimals: 6 }
+        };
+
+        // Token pair rates (simplified)
+        const pairRates = {
+            'BTC-USDT': 109512,
+            'ETH-USDT': 2777,
+            'SOL-USDT': 277,
+            'BNB-USDT': 2727,
+            'ADA-USDT': 1,
+            'ETH-BTC': 0.025,
+            'SOL-BTC': 0.0025,
+            'BNB-BTC': 0.025,
+            'ADA-BTC': 0.000009
+        };
+
+        function updateBalances() {
+            const inputToken = document.getElementById('input-token').value;
+            const outputToken = document.getElementById('output-token').value;
+
+            if (inputToken && tokenData[inputToken]) {
+                document.getElementById('input-balance').style.display = 'block';
+                document.getElementById('input-balance-amount').textContent = tokenData[inputToken].balance.toFixed(6);
+            } else {
+                document.getElementById('input-balance').style.display = 'none';
+            }
+
+            if (outputToken && tokenData[outputToken]) {
+                document.getElementById('output-balance').style.display = 'block';
+                document.getElementById('output-balance-amount').textContent = tokenData[outputToken].balance.toFixed(6);
+            } else {
+                document.getElementById('output-balance').style.display = 'none';
+            }
+        }
+
+        function calculateOutput() {
+            const inputToken = document.getElementById('input-token').value;
+            const outputToken = document.getElementById('output-token').value;
+            const inputAmount = parseFloat(document.getElementById('input-amount').value) || 0;
+
+            if (inputToken && outputToken && inputAmount > 0) {
+                const pairKey = `${inputToken}-${outputToken}`;
+                const reversePairKey = `${outputToken}-${inputToken}`;
+                
+                let rate = pairRates[pairKey] || (1 / pairRates[reversePairKey]);
+                
+                if (!rate) {
+                    // Fallback calculation using USDT as intermediary
+                    const inputToUsdt = pairRates[`${inputToken}-USDT`] || (1 / pairRates[`USDT-${inputToken}`]);
+                    const usdtToOutput = pairRates[`${outputToken}-USDT`] || (1 / pairRates[`USDT-${outputToken}`]);
+                    rate = inputToUsdt / usdtToOutput;
+                }
+
+                const outputAmount = inputAmount * rate;
+                document.getElementById('output-amount').value = outputAmount.toFixed(6);
+                
+                // Update rate display
+                document.getElementById('rate-display').textContent = 
+                    `1 ${inputToken} = ${rate.toFixed(6)} ${outputToken}`;
+                
+                // Enable swap button if both tokens are selected and amount is valid
+                const swapButton = document.getElementById('swap-button');
+                if (inputToken && outputToken && inputAmount > 0) {
+                    swapButton.disabled = false;
+                    swapButton.textContent = `Swap ${inputAmount} ${inputToken} for ${outputAmount.toFixed(6)} ${outputToken}`;
+                }
+            } else {
+                document.getElementById('output-amount').value = '';
+                document.getElementById('rate-display').textContent = 'Select tokens to see exchange rate';
+                document.getElementById('swap-button').disabled = true;
+                document.getElementById('swap-button').textContent = 'Connect Wallet to Swap';
+            }
+        }
+
+        function swapTokens() {
+            const inputToken = document.getElementById('input-token');
+            const outputToken = document.getElementById('output-token');
+            const inputAmount = document.getElementById('input-amount');
+            const outputAmount = document.getElementById('output-amount');
+
+            // Swap token selections
+            const tempToken = inputToken.value;
+            inputToken.value = outputToken.value;
+            outputToken.value = tempToken;
+
+            // Swap amounts
+            const tempAmount = inputAmount.value;
+            inputAmount.value = outputAmount.value;
+            outputAmount.value = tempAmount;
+
+            // Update displays
+            updateBalances();
+            calculateOutput();
+        }
+
+        function executeSwap() {
+            const inputToken = document.getElementById('input-token').value;
+            const outputToken = document.getElementById('output-token').value;
+            const inputAmount = parseFloat(document.getElementById('input-amount').value);
+            const outputAmount = parseFloat(document.getElementById('output-amount').value);
+
+            if (!inputToken || !outputToken || !inputAmount || !outputAmount) {
+                showError('Please select tokens and enter amounts');
+                return;
+            }
+
+            if (inputAmount > tokenData[inputToken].balance) {
+                showError('Insufficient balance');
+                return;
+            }
+
+            // Simulate swap execution
+            showSuccess(`Swap executed! ${inputAmount} ${inputToken} for ${outputAmount.toFixed(6)} ${outputToken}`);
+            
+            // Update balances (in a real app, this would be done by the blockchain)
+            tokenData[inputToken].balance -= inputAmount;
+            tokenData[outputToken].balance += outputAmount;
+            
+            // Clear inputs
+            document.getElementById('input-amount').value = '';
+            document.getElementById('output-amount').value = '';
+            document.getElementById('swap-button').disabled = true;
+            document.getElementById('swap-button').textContent = 'Connect Wallet to Swap';
+            
+            updateBalances();
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            document.getElementById('success-message').style.display = 'none';
+            
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        function showSuccess(message) {
+            const successDiv = document.getElementById('success-message');
+            successDiv.textContent = message;
+            successDiv.style.display = 'block';
+            document.getElementById('error-message').style.display = 'none';
+            
+            setTimeout(() => {
+                successDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('input-token').addEventListener('change', function() {
+                updateBalances();
+                calculateOutput();
+            });
+
+            document.getElementById('output-token').addEventListener('change', function() {
+                updateBalances();
+                calculateOutput();
+            });
+
+            document.getElementById('input-amount').addEventListener('input', function() {
+                calculateOutput();
+            });
+        });
+    </script>
+</body>
+</html> 

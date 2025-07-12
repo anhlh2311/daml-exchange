@@ -1,0 +1,59 @@
+# Daml Token Exchange System - Project Overview
+
+This is a sophisticated decentralized token exchange system built on Daml with four core workflow areas:
+
+## System Architecture
+
+### 1. Registry System (Party Management)
+
+- **PartyRegistry**: Central authority for managing party registration
+- **PartyRegistryUtils**: Validation and lookup utilities
+- Located in [daml/Registry/](mdc:daml/Registry/)
+
+### 2. Currency System (Token Management)
+
+- **TokenLedger**: Individual token balances with secure transfer mechanism
+- **TokenMaster**: Controls token supply and minting/burning
+- **TokenMetadata**: Token information (name, symbol, decimals)
+- Located in [daml/Currency/](mdc:daml/Currency/)
+
+### 3. Exchange System (Trading Infrastructure)
+
+- **TokenListing**: Manages which tokens are available for trading
+- **TokenPair**: Defines active trading pairs with exchange rates
+- **TokenSwap**: Executes token swaps between parties
+- Located in [daml/Exchange/](mdc:daml/Exchange/)
+
+### 4. Scripts and Utilities
+
+- **PartyManagement**: Party allocation and registration scripts
+- **SetupUtils**: System initialization utilities
+- **SwapUtils**: Trading pair and swap execution utilities
+- Located in [daml/Scripts/](mdc:daml/Scripts/)
+
+## Key Entry Points
+
+- **Main Setup**: [daml/Main.daml](mdc:daml/Main.daml) - System initialization script
+- **Configuration**: [daml.yaml](mdc:daml.yaml) - Project configuration and dependencies
+- **Documentation**: [README.md](mdc:README.md) - Comprehensive system documentation
+- **Workflow Guide**: [WORKFLOW.md](mdc:WORKFLOW.md) - Detailed workflow documentation
+
+## Core Design Principles
+
+1. **Privacy-First**: Only relevant parties can see contracts
+2. **Two-Step Transfers**: Lock/Accept pattern for secure token transfers
+3. **Admin-Controlled**: Centralized admin for listing and pair management
+4. **Validation-Heavy**: All operations validate party registration and permissions
+5. **Extensible**: Metadata-driven design for token properties
+
+## Testing Strategy
+
+Comprehensive test suite in [daml/Test/](mdc:daml/Test/) covering:
+
+- Party management workflows
+- Token lifecycle (mint → transfer → burn)
+- Trading pair setup and management
+- Swap execution flows
+alwaysApply: true
+
+---

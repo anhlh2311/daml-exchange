@@ -15,8 +15,9 @@ import Scripts.TokenPairUtils
 import Scripts.SwapUtils
 import Scripts.SetupUtils
 
-tokenSwapFlowTest = do
-   -- Registry setup & party registration
+initializeLedger : Decimal -> Decimal -> Decimal -> Decimal -> Script (ContractId TokenPair, (Party, (Party, Text), (Party, Text)), [Party])
+initializeLedger btcInitialSupply usdtInitialSupply sellingPrice buyingPrice = do
+  -- Registry setup & party registration
   registryCid <- initializeRegistry
   adminOpt <- getAdminParty
   let admin = fromSome adminOpt
@@ -28,10 +29,10 @@ tokenSwapFlowTest = do
 
   -- Initializing BTC and USDT tokens
   (btcMasterCid, btcOwnerLedgerCid) <- createToken 
-    btcOwner btcMetadata 100.0 admin
+    btcOwner btcMetadata btcInitialSupply admin
 
   (usdtMasterCid, usdtOwnerLedgerCid) <- createToken 
-    usdtOwner usdtMetadata 1000000000.0 admin
+    usdtOwner usdtMetadata usdtInitialSupply admin
 
   -- Create token listings
   let
@@ -47,7 +48,7 @@ tokenSwapFlowTest = do
   tokenPairSetupCid <- createTokenPairSetup admin lp btcMasterKey usdtMasterKey admin
 
   -- Create a token pair using listings
-  tokenPairCid <- createTokenPairWithSetup admin tokenPairSetupCid 109512.0 109483.0 admin
+  tokenPairCid <- createTokenPairWithSetup admin tokenPairSetupCid sellingPrice buyingPrice admin
 
   -- Fund Alice and Liquidity Provider
   -- create USDT TokenTransferLock for Alice
@@ -67,6 +68,15 @@ tokenSwapFlowTest = do
   activeBTCUSDTTokenPairOpt <- getActiveTokenPairByKey admin btcUsdtTokenPairKey
   let activeBTCUSDTTokenPairCid = (fromSome activeBTCUSDTTokenPairOpt)
 
+  return (activeBTCUSDTTokenPairCid, btcUsdtTokenPairKey, [admin, alice, bob, lp, btcOwner, usdtOwner])
+
+tokenSwapFlowTest = do
+  (activeBTCUSDTTokenPairCid, 
+    btcUsdtTokenPairKey, 
+    [admin, alice, bob, lp, btcOwner, usdtOwner]) <- initializeLedger 100.0 1000000000.0 109512.0 109483.0
+  let (admin, btcMasterKey, usdtMasterKey) = btcUsdtTokenPairKey
+
+  -- Get the rate of the token pair
   (sellingPrice, buyingPrice) <- submit alice do
     exerciseCmd activeBTCUSDTTokenPairCid GetRate with requester = alice
 
@@ -168,6 +178,7 @@ tokenSwapFlowTest = do
     (usdtOwner, alice) btcUsdtTokenPairKey 
     usdtInputAmount expectedBtcOutputAmount 
     admin
+  
 
   swapRequestOpt <- queryContractId alice swapRequestCid
   let swapRequest = (fromSome swapRequestOpt)
