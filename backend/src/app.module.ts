@@ -4,7 +4,6 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DamlModule } from './daml/daml.module';
 import { AuthModule } from './auth/auth.module';
-import { TokenModule } from './token/token.module';
 import appConfig from './config/app.config';
 
 @Module({
@@ -15,7 +14,6 @@ import appConfig from './config/app.config';
     }),
     DamlModule,
     AuthModule,
-    TokenModule,
   ],
   controllers: [AppController],
   providers: [AppService],

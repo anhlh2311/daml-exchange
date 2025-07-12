@@ -58,10 +58,9 @@ export class DamlService implements OnModuleInit {
     }
   }
   
-  async verifyConnection(token: string): Promise<any> {
+  async getParties(token: string): Promise<any> {
     try {
-      // Simple method to verify connection to DAML ledger
-      // Just get the parties visible to the token
+      // Get the parties visible to the token
       const response = await axios.get(
         `${this.httpBaseUrl}/v1/parties`,
         { headers: { Authorization: `Bearer ${token}` } }
@@ -70,14 +69,14 @@ export class DamlService implements OnModuleInit {
         success: true,
         ledgerId: response.data.ledgerId || 'Unknown',
         parties: response.data.result || [],
-        status: 'Connected to DAML ledger successfully'
+        status: 'Parties retrieved successfully'
       };
     } catch (error) {
-      this.logger.error('Error verifying DAML connection:', error.message);
+      this.logger.error('Error retrieving parties:', error.message);
       return {
         success: false,
         error: error.message,
-        status: 'Failed to connect to DAML ledger'
+        status: 'Failed to retrieve parties'
       };
     }
   }

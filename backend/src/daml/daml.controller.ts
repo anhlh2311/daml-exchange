@@ -19,14 +19,14 @@ export class DamlController {
     return { status: 'ok', message: 'DAML ledger is connected' };
   }
 
-  @Get('verify-connection')
+  @Get('parties')
   @ApiOperation({ 
-    summary: 'Verify DAML ledger connection with hardcoded token',
-    description: 'Tests connection to the DAML ledger using a hardcoded token with ledger ID "sandbox". Returns the list of parties visible to the token.'
+    summary: 'Get list of parties with hardcoded token',
+    description: 'Returns the list of parties visible to the hardcoded token with ledger ID "sandbox".'
   })
   @ApiResponse({ 
     status: 200, 
-    description: 'Connection verification results',
+    description: 'List of parties',
     schema: {
       type: 'object',
       properties: {
@@ -43,21 +43,69 @@ export class DamlController {
             }
           }
         },
-        status: { type: 'string', example: 'Connected to DAML ledger successfully' }
+        status: { type: 'string', example: 'Parties retrieved successfully' }
       }
     }
   })
-  @ApiResponse({ status: 500, description: 'Failed to connect to DAML ledger' })
-  async verifyConnection() {
+  @ApiResponse({ status: 500, description: 'Failed to retrieve parties' })
+  async getParties() {
     try {
       // Use a hardcoded DAML token for verification
       const damlToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwczovL2RhbWwuY29tL2xlZGdlci1hcGkiOnsibGVkZ2VySWQiOiJzYW5kYm94IiwiYXBwbGljYXRpb25JZCI6ImRhbWwtZXhjaGFuZ2UtYmFja2VuZCIsImFjdEFzIjpbIkFsaWNlIl19fQ.Cj0dGxR0gZpwW5yR7jHNvqOzjEKjC5Mwvtk_6iNO-GQ';
       
-      const result = await this.damlService.verifyConnection(damlToken);
+      const result = await this.damlService.getParties(damlToken);
       return result;
     } catch (error) {
       throw new HttpException(
-        error.message || 'Failed to verify DAML connection',
+        error.message || 'Failed to retrieve parties',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+  
+  @Get('parties/authenticated')
+  @ApiBearerAuth()
+  @ApiOperation({ 
+    summary: 'Get list of parties with authentication',
+    description: 'Returns the list of parties visible to the authenticated user.'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'List of parties',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        ledgerId: { type: 'string', example: 'sandbox' },
+        parties: { 
+          type: 'array', 
+          items: {
+            type: 'object',
+            properties: {
+              displayName: { type: 'string', example: 'Alice' },
+              identifier: { type: 'string', example: 'Alice::12345...' },
+              isLocal: { type: 'boolean', example: true }
+            }
+          }
+        }
+      }
+    }
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 500, description: 'Failed to retrieve parties' })
+  async getPartiesAuthenticated(@Headers('authorization') authorization: string) {
+    try {
+      // Extract token from Authorization header
+      const token = authorization?.replace('Bearer ', '') || '';
+      if (!token) {
+        throw new HttpException('Authorization token is required', HttpStatus.UNAUTHORIZED);
+      }
+      
+      const result = await this.damlService.getParties(token);
+      return result;
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to retrieve parties',
         HttpStatus.INTERNAL_SERVER_ERROR
       );
     }
