@@ -2,6 +2,10 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 
+// JWT tokens for DAML JSON API authentication
+const ALICE_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwczovL2RhbWwuY29tL2xlZGdlci1hcGkiOnsibGVkZ2VySWQiOiJzYW5kYm94IiwiYXBwbGljYXRpb25JZCI6IkhUVFAtSlNPTi1BUEktR2F0ZXdheSIsImFjdEFzIjpbIkFsaWNlIl19fQ.FIjS4ao9yu1XYnv1ZL3t7ooPNIyQYAHY3pmzej4EMCM';
+const BOB_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwczovL2RhbWwuY29tL2xlZGdlci1hcGkiOnsibGVkZ2VySWQiOiJzYW5kYm94IiwiYXBwbGljYXRpb25JZCI6IkhUVFAtSlNPTi1BUEktR2F0ZXdheSIsImFjdEFzIjpbIkJvYiJdfX0.y6iwpnYt-ObtNo_FyLVxMtNTwpJF8uxzNfPELQUVKVg';
+
 export interface DamlChoice {
   name: string;
   parameterType: string;
@@ -22,7 +26,10 @@ export class TemplatesService {
   private readonly damlJsonApiUrl: string;
   
   constructor(private configService: ConfigService) {
-    this.damlJsonApiUrl = this.configService.get<string>('daml.jsonApiUrl') || 'http://localhost:7575';
+    const host = this.configService.get<string>('daml.ledger.host') || 'localhost';
+    const httpPort = this.configService.get<number>('daml.ledger.httpPort') || 7575;
+    this.damlJsonApiUrl = `http://${host}:${httpPort}`;
+    console.log(`DAML JSON API URL: ${this.damlJsonApiUrl}`);
   }
   
   /**
@@ -31,8 +38,12 @@ export class TemplatesService {
    */
   async getAllTemplateDefinitions(): Promise<DamlTemplate[]> {
     try {
-      // Step 1: Get all packages from the DAML ledger
-      const packagesResponse = await axios.get(`${this.damlJsonApiUrl}/v1/packages`);
+      // Step 1: Get all packages from the DAML ledger with authentication
+      const packagesResponse = await axios.get(`${this.damlJsonApiUrl}/v1/packages`, {
+        headers: {
+          'Authorization': `Bearer ${BOB_TOKEN}`,
+        },
+      });
       const packageIds = packagesResponse.data.result;
       
       // Step 2: Process each package to extract templates
@@ -40,8 +51,12 @@ export class TemplatesService {
       
       for (const packageId of packageIds) {
         try {
-          // Get package details
-          const packageResponse = await axios.get(`${this.damlJsonApiUrl}/v1/packages/${packageId}`);
+          // Get package details with authentication
+          const packageResponse = await axios.get(`${this.damlJsonApiUrl}/v1/packages/${packageId}`, {
+            headers: {
+              'Authorization': `Bearer ${ALICE_TOKEN}`,
+            },
+          });
           const packageData = packageResponse.data;
           
           // Extract modules and templates
@@ -89,105 +104,24 @@ export class TemplatesService {
       return templates;
     } catch (error) {
       console.error('Error fetching templates from DAML JSON API:', error.message);
-      console.log('Using fallback mock templates data');
-      return this.getMockTemplates();
+      if (error.response) {
+        // The request was made and the server responded with a status code outside of 2xx
+        console.error('Response data:', error.response.data);
+        console.error('Response status:', error.response.status);
+        console.error('Response headers:', error.response.headers);
+      } else if (error.request) {
+        // The request was made but no response was received
+        console.error('No response received:', error.request);
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        console.error('Error config:', error.config);
+      }
+      throw new HttpException(
+        `Failed to fetch templates from DAML JSON API: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
   
-  /**
-   * Fallback method that returns mock template data
-   * Used when the DAML JSON API is not available
-   */
-  private getMockTemplates(): DamlTemplate[] {
-    return [
-      {
-        packageId: 'exchange-0.0.1',
-        moduleName: 'Currency',
-        entityName: 'TokenLedger',
-        templateId: 'exchange-0.0.1:Currency:TokenLedger',
-        choices: [
-          {
-            name: 'Transfer',
-            parameterType: 'TransferParams',
-            returnType: 'ContractId TokenLedger',
-            controllers: ['issuer'],
-          },
-          {
-            name: 'Burn',
-            parameterType: 'Unit',
-            returnType: 'ContractId TokenLedger',
-            controllers: ['issuer'],
-          },
-        ],
-      },
-      {
-        packageId: 'exchange-0.0.1',
-        moduleName: 'Currency',
-        entityName: 'TokenMetadata',
-        templateId: 'exchange-0.0.1:Currency:TokenMetadata',
-        choices: [
-          {
-            name: 'Archive',
-            parameterType: 'Unit',
-            returnType: 'Unit',
-            controllers: ['issuer'],
-          },
-        ],
-      },
-      {
-        packageId: 'exchange-0.0.1',
-        moduleName: 'Exchange',
-        entityName: 'TokenPair',
-        templateId: 'exchange-0.0.1:Exchange:TokenPair',
-        choices: [
-          {
-            name: 'Archive',
-            parameterType: 'Unit',
-            returnType: 'Unit',
-            controllers: ['exchange'],
-          },
-        ],
-      },
-      {
-        packageId: 'exchange-0.0.1',
-        moduleName: 'Exchange',
-        entityName: 'TokenSwap',
-        templateId: 'exchange-0.0.1:Exchange:TokenSwap',
-        choices: [
-          {
-            name: 'Accept',
-            parameterType: 'Unit',
-            returnType: 'ContractId TokenSwapResult',
-            controllers: ['counterparty'],
-          },
-          {
-            name: 'Cancel',
-            parameterType: 'Unit',
-            returnType: 'Unit',
-            controllers: ['initiator'],
-          },
-        ],
-      },
-      {
-        packageId: 'exchange-0.0.1',
-        moduleName: 'Registry',
-        entityName: 'PartyRegistry',
-        templateId: 'exchange-0.0.1:Registry:PartyRegistry',
-        choices: [
-          {
-            name: 'AddParty',
-            parameterType: 'AddPartyParams',
-            returnType: 'ContractId PartyRegistry',
-            controllers: ['operator'],
-          },
-          {
-            name: 'RemoveParty',
-            parameterType: 'RemovePartyParams',
-            returnType: 'ContractId PartyRegistry',
-            controllers: ['operator'],
-          },
-        ],
-      },
-    ];
-  }
+
 }

@@ -68,6 +68,14 @@ async function fetchTemplates() {
     return response.data;
   } catch (error) {
     console.error('Error fetching templates:', error.message);
+    if (error.response) {
+      // The request was made and the server responded with a status code outside of 2xx
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', error.response.data);
+    } else if (error.request) {
+      // The request was made but no response was received
+      console.error('No response received. Is the server running?');
+    }
     throw error;
   }
 }
@@ -83,6 +91,20 @@ async function templatesExample() {
     const result = await fetchTemplates();
     console.log('Response:');
     console.log(JSON.stringify(result, null, 2));
+    
+    // Check if we got templates and how many
+    if (result && result.templates && Array.isArray(result.templates)) {
+      console.log(`Successfully retrieved ${result.templates.length} templates`);
+      
+      // Show a summary of the templates
+      if (result.templates.length > 0) {
+        console.log('\nTemplate Summary:');
+        result.templates.forEach((template, index) => {
+          console.log(`${index + 1}. ${template.moduleName}.${template.entityName} (${template.choices?.length || 0} choices)`);
+        });
+      }
+    }
+    
     return result;
   } catch (error) {
     console.error('Request failed:', error.message);
