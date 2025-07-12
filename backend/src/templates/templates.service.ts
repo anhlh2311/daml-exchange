@@ -44,7 +44,10 @@ export class TemplatesService {
           'Authorization': `Bearer ${BOB_TOKEN}`,
         },
       });
-      const packageIds = packagesResponse.data.result;
+      
+      // console.log('Packages response:', JSON.stringify(packagesResponse.data, null, 2));
+      const packageIds = packagesResponse.data.result || [];
+      console.log(`Found ${packageIds.length} packages:`, packageIds);
       
       // Step 2: Process each package to extract templates
       const templates: DamlTemplate[] = [];
@@ -52,12 +55,38 @@ export class TemplatesService {
       for (const packageId of packageIds) {
         try {
           // Get package details with authentication
+          console.log(`Fetching details for package: ${packageId}`);
           const packageResponse = await axios.get(`${this.damlJsonApiUrl}/v1/packages/${packageId}`, {
             headers: {
               'Authorization': `Bearer ${ALICE_TOKEN}`,
             },
           });
           const packageData = packageResponse.data;
+          
+          // Log package structure
+          console.log(`Package ${packageId} structure:`);
+          console.log('- Has modules:', packageData && packageData.modules ? Object.keys(packageData.modules).length : 0);
+          if (packageData && packageData.modules) {
+            const moduleNames = Object.keys(packageData.modules);
+            // console.log('- Module names:', moduleNames);
+            
+            // Log first module structure as example
+            if (moduleNames.length > 0) {
+              const firstModule = packageData.modules[moduleNames[0]];
+              // console.log(`- First module '${moduleNames[0]}' structure:`, Object.keys(firstModule));
+              // console.log('- Has templates:', firstModule.templates ? Object.keys(firstModule.templates).length : 0);
+              
+              // Log first template if available
+              if (firstModule.templates) {
+                const templateNames = Object.keys(firstModule.templates);
+                if (templateNames.length > 0) {
+                  const firstTemplate = firstModule.templates[templateNames[0]];
+                  // console.log(`- First template '${templateNames[0]}' structure:`, Object.keys(firstTemplate));
+                  // console.log('- Has choices:', firstTemplate.choices ? Object.keys(firstTemplate.choices).length : 0);
+                }
+              }
+            }
+          }
           
           // Extract modules and templates
           if (packageData && packageData.modules) {
