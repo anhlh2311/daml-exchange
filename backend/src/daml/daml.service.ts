@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { Ledger } from '@daml/ledger';
 import * as damlTypes from '@daml/types';
+import { DAML_TOKENS, API_ENDPOINTS, DEFAULT_CONFIG } from '../common/constants';
 
 @Injectable()
 export class DamlService implements OnModuleInit {
@@ -28,11 +29,11 @@ export class DamlService implements OnModuleInit {
 
   async checkLedgerConnection(): Promise<boolean> {
     try {
-      // Use a hardcoded DAML token for the ledger connection check
-      const damlToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwczovL2RhbWwuY29tL2xlZGdlci1hcGkiOnsibGVkZ2VySWQiOiJzYW5kYm94IiwiYXBwbGljYXRpb25JZCI6ImRhbWwtZXhjaGFuZ2UtYmFja2VuZCIsImFjdEFzIjpbIkFsaWNlIl19fQ.Cj0dGxR0gZpwW5yR7jHNvqOzjEKjC5Mwvtk_6iNO-GQ';
+      // Use the DAML token from constants for the ledger connection check
+      const damlToken = DAML_TOKENS.BACKEND;
       
       const response = await axios.get(
-        `${this.httpBaseUrl}/v1/query`,
+        `${this.httpBaseUrl}${API_ENDPOINTS.DAML_JSON_API.QUERY}`,
         { headers: { Authorization: `Bearer ${damlToken}` } }
       );
       return response.status === 200;

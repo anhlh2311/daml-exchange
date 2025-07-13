@@ -1,13 +1,8 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
+import { DAML_TOKENS, GRAPHQL_AUTH_COOKIE, API_ENDPOINTS, DEFAULT_CONFIG } from '../common/constants';
 
-// JWT tokens for DAML JSON API authentication
-const ALICE_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwczovL2RhbWwuY29tL2xlZGdlci1hcGkiOnsibGVkZ2VySWQiOiJzYW5kYm94IiwiYXBwbGljYXRpb25JZCI6IkhUVFAtSlNPTi1BUEktR2F0ZXdheSIsImFjdEFzIjpbIkFsaWNlIl19fQ.FIjS4ao9yu1XYnv1ZL3t7ooPNIyQYAHY3pmzej4EMCM';
-const BOB_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwczovL2RhbWwuY29tL2xlZGdlci1hcGkiOnsibGVkZ2VySWQiOiJzYW5kYm94IiwiYXBwbGljYXRpb25JZCI6IkhUVFAtSlNPTi1BUEktR2F0ZXdheSIsImFjdEFzIjpbIkJvYiJdfX0.y6iwpnYt-ObtNo_FyLVxMtNTwpJF8uxzNfPELQUVKVg';
-
-// Authentication cookie for GraphQL API
-const AUTH_COOKIE = "_ga=GA1.1.444531873.1731571982; _ga_LLP0C2ZVWY=GS1.1.1731620083.3.0.1731620083.0.0.0; secure_customer_sig=; localization=VN; _tracking_consent=%7B%22con%22%3A%7B%22CMP%22%3A%7B%22a%22%3A%22%22%2C%22m%22%3A%22%22%2C%22p%22%3A%22%22%2C%22s%22%3A%22%22%7D%7D%2C%22v%22%3A%222.1%22%2C%22region%22%3A%22VNHN%22%2C%22reg%22%3A%22%22%2C%22purposes%22%3A%7B%22a%22%3Atrue%2C%22p%22%3Atrue%2C%22m%22%3Atrue%2C%22t%22%3Atrue%7D%2C%22display_banner%22%3Afalse%2C%22sale_of_data_region%22%3Afalse%2C%22consent_id%22%3A%223404F9EA-15f5-4F21-98ba-41ea89486013%22%7D; _shopify_y=0b54dc71-c5ed-4198-a3fa-ce408c3ac021; _shopify_essential=:AZPeMZkZAAH_baCUaOhGcCZujTsGvfsAghWsdbidKx3xZKbhUQ3BeTjsifb-SaZklNCRuLC5im4ZKuw3TMWQUa4jbW4FUubEDLBu0CJlXwQ9z__vQd_ZE8wESgJ3zBBm:; csrftoken=oLlCrTMHDTIf1BUquAufkbeqYHw8eByc; session-id=d58a5518-1161-49b0-a757-06e4d093fc06";
 
 export interface DamlChoice {
   name: string;
@@ -126,7 +121,7 @@ export class TemplatesService {
           "sec-fetch-mode": "cors",
           "sec-fetch-site": "same-origin",
           // Include the cookie for authentication
-          "cookie": AUTH_COOKIE
+          "cookie": GRAPHQL_AUTH_COOKIE
         }
       });
       
