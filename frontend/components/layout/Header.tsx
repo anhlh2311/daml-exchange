@@ -11,6 +11,7 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard' },
   { name: 'Tokens', href: '/tokens' },
   { name: 'Exchange', href: '/exchange' },
+  { name: 'Templates', href: '/templates' },
 ];
 
 function classNames(...classes: string[]) {
