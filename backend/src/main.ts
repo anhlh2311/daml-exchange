@@ -28,11 +28,22 @@ async function bootstrap() {
       '- `/api/daml/verify-connection`: Test DAML ledger connection with hardcoded token\n' +
       '- `/api/daml/health`: Check if DAML ledger is accessible\n' +
       '- `/api/daml/ledger-id`: Get the DAML ledger ID\n' +
-      '- `/api/tokens/test-template/{templateId}`: Test fetching contracts of any template ID\n\n' +
+      '- `/api/tokens/test-template/{templateId}`: Test fetching contracts of any template ID\n' +
+      '- `/api/templates`: Get all DAML templates using GraphQL API\n\n' +
+      '### Templates API\n' +
+      'The `/api/templates` endpoint provides access to all DAML templates available on the ledger. ' +
+      'This implementation uses GraphQL to query the DAML ledger and returns template metadata including:\n' +
+      '- Template IDs and package information\n' +
+      '- Module and entity names\n' +
+      '- Contract counts\n' +
+      '- Available choices\n\n' +
+      'The response includes both template data and metadata about the query. ' +
+      'For examples of how to use this API, see the `requests.js` utility script in the project root.\n\n' +
       '### Note\n' +
-      'Other endpoints have been temporarily hidden from Swagger as they are being updated to work with the correct DAML token authentication.'
+      'Some endpoints have been temporarily hidden from Swagger as they are being updated to work with the correct DAML token authentication.'
     )
     .setVersion('1.0')
+    .addTag('templates', 'Operations related to DAML templates')
     .build();
   
   const document = SwaggerModule.createDocument(app, config);
