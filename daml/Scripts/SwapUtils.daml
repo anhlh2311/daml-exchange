@@ -8,8 +8,8 @@ import Exchange.TokenPair
 import Exchange.TokenSwapUtils
 
 -- Create a swap request with token locking
-createSwapWithTokenLocking: Party -> Party -> Party -> (Party, Party) -> (Party, (Party, Text), (Party, Text)) -> Decimal -> Decimal -> Party -> Script (ContractId SwapRequest)
-createSwapWithTokenLocking swapper admin liquidityProvider inputTokenLedgerKey tokenPairKey inputAmount expectedOutputAmount registryKey = do
+createSwapWithTokenLocking: Party -> Party -> Party -> (Party, Party) -> (Party, (Party, Text), (Party, Text)) -> Decimal -> Decimal -> Decimal -> Party -> Script (ContractId SwapRequest)
+createSwapWithTokenLocking swapper admin liquidityProvider inputTokenLedgerKey tokenPairKey inputAmount expectedOutputAmount slippageTolerance registryKey = do
   -- Validate token pair's existence
   tokenPairOpt <- queryContractKey @TokenPair swapper tokenPairKey
   let tokenPairCid = (fromSome tokenPairOpt)._1
@@ -22,7 +22,6 @@ createSwapWithTokenLocking swapper admin liquidityProvider inputTokenLedgerKey t
 
   -- Calculate the expected output amount
   let calculatedOutputAmount = calculateExpectedOutputAmount inputTokenLedger.symbol tokenPair inputAmount
-
   assertMsg "Output amount below minimum expected" (calculatedOutputAmount >= expectedOutputAmount)
 
   -- Lock the input tokens for the LP
@@ -36,29 +35,5 @@ createSwapWithTokenLocking swapper admin liquidityProvider inputTokenLedgerKey t
   -- Create the swap request
   submit swapper do 
     createCmd SwapRequest with
-      ..
-
--- Create a liquidity response with token locking
-createLiquidityResponse: Party -> Party -> Party -> ContractId SwapRequest -> (Party, Party) -> Party -> Script (ContractId LiquidityResponse)
-createLiquidityResponse liquidityProvider swapper admin swapRequestCid liquidityLedgerKey registryKey = do
-  -- Fetch the liquidity ledger
-  liquidityLedgerOpt <- queryContractKey @TokenLedger liquidityProvider liquidityLedgerKey
-  debug $ "Liquidity ledger opt: " <> show liquidityLedgerOpt
-  let liquidityLedgerCid = (fromSome liquidityLedgerOpt)._1
-
-  -- Fetch the swap request
-  swapRequestOpt <- queryContractId liquidityProvider swapRequestCid
-  let swapRequest = (fromSome swapRequestOpt)
-  
-  -- Create token transfer lock
-  (outputTokenLockCid, _) <- submit liquidityProvider do
-    exerciseCmd liquidityLedgerCid LockTokenForTransfer
-      {
-        recipient = swapper,
-        transferAmount = swapRequest.expectedOutputAmount
-      }
-
-  -- create the liquidity response
-  submit liquidityProvider do
-    createCmd LiquidityResponse with
+      outputTokenLockCid = None
       ..

@@ -13,12 +13,16 @@ calculateBuyingAmount amount buyingPrice = amount * buyingPrice
 calculateExpectedOutputAmount: Text -> TokenPair -> Decimal -> Decimal
 calculateExpectedOutputAmount symbol tokenPair inputAmount = do
   if symbol == (snd tokenPair.inputTokenKey)
-    then calculateSellingAmount inputAmount tokenPair.sellingPrice
-    else calculateBuyingAmount inputAmount tokenPair.buyingPrice
+    then calculateBuyingAmount inputAmount tokenPair.buyingPrice
+    else calculateSellingAmount inputAmount tokenPair.sellingPrice
 
 -- Swap validation helper
 validateSwapAmounts : Decimal -> Decimal -> Decimal -> Decimal -> Bool
 validateSwapAmounts inputAmount outputAmount sellingPrice buyingPrice =
   let calculatedOutput = calculateSellingAmount inputAmount sellingPrice
       calculatedInput = calculateBuyingAmount outputAmount buyingPrice
-  in calculatedOutput >= outputAmount && calculatedInput <= inputAmount 
+  in calculatedOutput >= outputAmount && calculatedInput <= inputAmount
+
+-- Range validation
+rangeValidation: Decimal -> Decimal -> Decimal -> Bool
+rangeValidation lowerBound upperBound value = lowerBound <= value && value <= upperBound
