@@ -1,6 +1,7 @@
 import { Controller, Get, HttpException, HttpStatus } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { ContractsService, DamlContract } from './contracts.service';
+import { ContractsService } from './contracts.service';
+import { DamlContract } from '../common/interfaces';
 
 @ApiTags('contracts')
 @Controller('api/contracts')

@@ -2,18 +2,9 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { GRAPHQL_AUTH_COOKIE, DEFAULT_CONFIG } from '../common/constants';
+import { DamlContract } from '../common/interfaces';
 
-export interface DamlContract {
-  id: string;
-  templateId: string;
-  argument: any;
-  createTime: string;
-  archived: boolean;
-  choices?: Array<{
-    name: string;
-    inheritedInterface?: string;
-  }>;
-}
+
 
 @Injectable()
 export class ContractsService {

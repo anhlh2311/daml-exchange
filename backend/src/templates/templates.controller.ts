@@ -1,6 +1,7 @@
 import { Controller, Get, HttpException, HttpStatus } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { TemplatesService, DamlTemplate } from './templates.service';
+import { TemplatesService } from './templates.service';
+import { DamlTemplate } from '../common/interfaces';
 
 @ApiTags('templates')
 @Controller('api/templates')

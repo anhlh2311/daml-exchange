@@ -2,23 +2,9 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { DAML_TOKENS, GRAPHQL_AUTH_COOKIE, API_ENDPOINTS, DEFAULT_CONFIG } from '../common/constants';
+import { DamlTemplate, DamlChoice } from '../common/interfaces';
 
 
-export interface DamlChoice {
-  name: string;
-  parameterType: string;
-  returnType: string;
-  controllers: string[];
-}
-
-export interface DamlTemplate {
-  packageId: string;
-  moduleName: string;
-  entityName: string;
-  templateId: string;
-  choices: DamlChoice[];
-  contractCount?: number; // Optional count of contracts for this template
-}
 
 @Injectable()
 export class TemplatesService {
