@@ -12,6 +12,7 @@ const navigation = [
   { name: 'Tokens', href: '/tokens' },
   { name: 'Exchange', href: '/exchange' },
   { name: 'Templates', href: '/templates' },
+  { name: 'Contracts', href: '/contracts' },
 ];
 
 function classNames(...classes: string[]) {
