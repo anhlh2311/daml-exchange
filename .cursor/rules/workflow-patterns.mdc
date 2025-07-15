@@ -69,23 +69,58 @@ ensurePartyIsRegistered registryKey party
 - **Admin** can remove trading pairs using `RemoveTokenPair`
 - Rates are maintained as separate buying and selling prices
 
-## 5. Swap Execution Workflow
+## 5. Swap Execution Workflow (Redesigned)
 
-### Swap Process
+### Swap Initiation Process
 
-1. **Trader** initiates swap using [TokenSwap](mdc:daml/Exchange/TokenSwap.daml)
-2. System validates:
-   - Both parties are registered
-   - Token pair exists and is active
-   - Sufficient balances for both tokens
-3. **Counterparty** must accept the swap
-4. Tokens are transferred using the two-step transfer pattern
+1. **Swapper** calls `createSwapWithTokenLocking` utility function from [SwapUtils](mdc:daml/Scripts/SwapUtils.daml)
+2. System validates TokenPair exists and is active
+3. Calculates expected output amount using `calculateExpectedOutputAmount` with direction awareness
+4. Locks input tokens via TokenTransferLock for the liquidity provider
+5. Creates [SwapRequest](mdc:daml/Exchange/TokenSwap.daml) with swap details, expected output, and slippage tolerance
+
+### Two-Phase Swap Execution
+
+#### Phase 1 - LP Acceptance
+
+1. **Liquidity Provider** reviews [SwapRequest](mdc:daml/Exchange/TokenSwap.daml) directly
+2. **LP** calls `AcceptSwap` choice on SwapRequest
+3. System validates current rates against slippage tolerance using real-time rate checking
+4. LP's output tokens are locked for the swapper
+5. LP immediately receives input tokens from the locked transfer
+6. SwapRequest is updated with output token lock information
+
+#### Phase 2 - Swapper Finalization
+
+1. **Swapper** calls `FinalizeSwap` choice on the updated SwapRequest
+2. Swapper receives the locked output tokens
+3. Swap is completed atomically
+
+### Enhanced Slippage Protection
+
+- **Configurable Tolerance**: Swappers set acceptable slippage percentage (0-100%)
+- **Real-time Validation**: Current rates checked against tolerance at LP acceptance time
+- **Automatic Rejection**: Swaps exceeding tolerance are automatically rejected
+- **Range Validation**: Slippage tolerance validated using `rangeValidation` function
+
+### Direction-Aware Calculations
+
+- Uses `calculateExpectedOutputAmount` from [TokenSwapUtils](mdc:daml/Exchange/TokenSwapUtils.daml)
+- Handles input vs quote token direction automatically
+- Applies proper buying/selling price selection based on token flow
+
+### Cancellation and Rejection Flows
+
+- **Swapper** can `CancelSwapRequest` to retrieve locked tokens
+- **LP** can `RejectSwapRequest` to create reverse lock for swapper
+- All cancellations return tokens to original holders safely
 
 ### Swap Validation
 
-- Uses [TokenSwapUtils](mdc:daml/Exchange/TokenSwapUtils.daml) for validation
-- Ensures exchange rates are within acceptable bounds
-- Validates token pair is active and not removed
+- Enhanced rate validation with slippage protection
+- Current TokenPair rates checked at time of LP decision
+- Balance validation for both input and output tokens
+- Party registration validation for all participants
 
 ## 6. Utility Functions
 
@@ -102,6 +137,7 @@ ensurePartyIsRegistered registryKey party
 ### Swap Utilities
 
 - [SwapUtils](mdc:daml/Scripts/SwapUtils.daml): Swap execution and validation helpers
+- [TokenSwapUtils](mdc:daml/Exchange/TokenSwapUtils.daml): Enhanced calculation and validation functions
 
 ## Key Business Rules
 
@@ -111,6 +147,7 @@ ensurePartyIsRegistered registryKey party
 - TokenTransferLock: Only sender, recipient, and owner can see
 - TokenListing: Admin and token owner can see
 - TokenPair: All registered parties can observe
+- SwapRequest: Only swapper, admin, and liquidity provider can see
 
 ### Authorization Rules
 
@@ -118,6 +155,7 @@ ensurePartyIsRegistered registryKey party
 - Only token holders can initiate transfers
 - Only admin can approve listings and manage pairs
 - Only registered parties can participate in swaps
+- Only liquidity providers can accept/reject swap requests
 
 ### Validation Rules
 
@@ -125,6 +163,39 @@ ensurePartyIsRegistered registryKey party
 - Sufficient balance checks for all transfers
 - Party registration validation for all operations
 - Token pair must be active for swaps
-description: Workflow patterns and business logic for the Daml exchange system
+- Slippage tolerance must be within 0-100% range
+- Current rates validated against slippage at LP acceptance time
+
+## Updated Swap Design Features
+
+### 1. Simplified Architecture
+
+- **Single Template Approach**: Removed LiquidityResponse template for direct SwapRequest interaction
+- **Streamlined Choices**: `AcceptSwap`, `FinalizeSwap`, `CancelSwapRequest`, `RejectSwapRequest`
+- **Reduced Complexity**: Fewer contracts to manage while maintaining security
+
+### 2. Enhanced Slippage Protection
+
+- **Configurable Tolerance**: Swappers set acceptable slippage percentage
+- **Real-time Validation**: Current rates checked against tolerance at LP acceptance time
+- **Automatic Rejection**: Swaps exceeding tolerance are automatically rejected
+
+### 3. Improved Calculation Logic
+
+- **Direction-Aware Calculations**: `calculateExpectedOutputAmount` handles input vs quote token direction
+- **Dynamic Rate Application**: Proper buying/selling price selection based on token flow
+- **Range Validation**: Ensures slippage tolerance within acceptable bounds
+
+### 4. Two-Phase Execution Model
+
+- **Phase 1 (LP Accept)**: LP validates, locks output tokens, receives input tokens immediately
+- **Phase 2 (Swapper Finalize)**: Swapper accepts output tokens to complete swap
+- **Atomic Phases**: Each phase is atomic, preventing partial state inconsistencies
+
+### 5. Enhanced Error Recovery
+
+- **Reverse Lock Creation**: LP rejection creates automatic recovery path for swappers
+- **Multiple Cancel Options**: Swappers can cancel at different stages
+- **Graceful Degradation**: System handles various failure scenarios with token recovery
 
 ---

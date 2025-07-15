@@ -29,6 +29,26 @@ choice Accept: ContractId TokenLedger
     -- Transfer completion
 ```
 
+#### Two-Phase Swap Execution Pattern
+
+```daml
+-- Phase 1: LP accepts swap with slippage validation
+choice AcceptSwap: (ContractId TokenLedger, ContractId SwapRequest)
+  with
+    outputTokenLedgerKey: (Party, Party)
+  controller liquidityProvider
+  do
+    -- Real-time rate validation against slippage tolerance
+    -- Lock output tokens and receive input tokens immediately
+    -- Update SwapRequest with output lock information
+
+-- Phase 2: Swapper finalizes swap
+choice FinalizeSwap: ContractId TokenLedger
+  controller swapper
+  do
+    -- Complete the swap by accepting output tokens
+```
+
 #### Admin-Controlled Operations
 
 ```daml
@@ -53,10 +73,35 @@ assertMsg (amount > 0.0) "Amount must be positive"
 assertMsg (amount <= ledger.amount) "Insufficient balance"
 ```
 
+#### Slippage Tolerance Validation
+
+```daml
+-- Validate slippage tolerance is within acceptable range (0-100%)
+ensure rangeValidation 0.0 1.0 slippageTolerance
+
+-- Real-time slippage check during swap acceptance
+let 
+  calculatedOutputAmount = calculateExpectedOutputAmount inputSymbol tokenPair inputAmount
+  minAcceptableAmount = expectedOutputAmount * (1.0 - slippageTolerance)
+assertMsg "Calculated output amount below minimum acceptable (slippage exceeded)" 
+  (calculatedOutputAmount >= minAcceptableAmount)
+```
+
 #### Authorization Checks
 
 ```daml
 assertMsg (controller == owner) "Only owner can perform this action"
+```
+
+### Direction-Aware Calculation Pattern
+
+```daml
+-- Calculate expected output based on token direction
+calculateExpectedOutputAmount: Text -> TokenPair -> Decimal -> Decimal
+calculateExpectedOutputAmount symbol tokenPair inputAmount = do
+  if symbol == (snd tokenPair.inputTokenKey)
+    then calculateBuyingAmount inputAmount tokenPair.buyingPrice
+    else calculateSellingAmount inputAmount tokenPair.sellingPrice
 ```
 
 ## Privacy and Visibility
@@ -67,6 +112,7 @@ assertMsg (controller == owner) "Only owner can perform this action"
 - **TokenTransferLock**: Only sender, recipient, and owner can see
 - **TokenListing**: Admin and token owner can see
 - **TokenPair**: All registered parties can observe
+- **SwapRequest**: Only swapper (signatory), admin, and liquidity provider (observers) can see
 
 ### Observer Management
 
@@ -89,6 +135,19 @@ observers = [] -- No additional observers for privacy
 -- Safe unwrapping with validation
 let admin = fromSome adminOpt
 assertMsg (isSome adminOpt) "Admin party not found"
+
+-- Handle optional output token lock in SwapRequest
+outputLockCid <- case outputTokenLockCid of
+  Some cid -> pure cid
+  None -> abort "No output token lock set"
+```
+
+### Slippage Error Handling
+
+```daml
+-- Automatic slippage rejection with clear error message
+assertMsg "Calculated output amount below minimum acceptable (slippage exceeded)" 
+  (calculatedOutputAmount >= minAcceptableAmount)
 ```
 
 ## Metadata and Extensibility
@@ -104,10 +163,28 @@ template TokenMetadata
     decimals: Int
 ```
 
+### SwapRequest Structure
+
+```daml
+template SwapRequest
+  with
+    swapper: Party
+    admin: Party
+    liquidityProvider: Party
+    tokenPairKey: (Party, (Party, Text), (Party, Text))
+    inputAmount: Decimal
+    expectedOutputAmount: Decimal
+    inputTokenLockCid: ContractId TokenTransferLock
+    outputTokenLockCid: Optional (ContractId TokenTransferLock)
+    slippageTolerance: Decimal -- Percentage (0.0 to 1.0)
+    registryKey: Party
+```
+
 ### Registry Key Pattern
 
 - Use `(Party, Text)` tuples for unique identifiers
 - Example: `(tokenOwner, "USDC")` for token listings
+- Use `(Party, (Party, Text), (Party, Text))` for token pair keys
 
 ## Testing Patterns
 
@@ -120,6 +197,42 @@ testName = do
   -- Execute test operations
   -- Verify expected outcomes
   return ()
+```
+
+### Swap Testing Patterns
+
+```daml
+-- Test successful swap with slippage protection
+testSwapSuccess = do
+  -- Create swap request with slippage tolerance
+  swapRequestCid <- createSwapWithTokenLocking 
+    swapper admin lp 
+    inputTokenLedgerKey tokenPairKey 
+    inputAmount expectedOutputAmount 
+    slippageTolerance
+    admin
+  
+  -- LP accepts swap
+  (lpTokenLedgerCid, acceptedSwapRequestCid) <- submit lp do
+    exerciseCmd swapRequestCid AcceptSwap with
+      outputTokenLedgerKey = outputKey
+  
+  -- Swapper finalizes swap
+  swapperTokenLedgerCid <- submit swapper do
+    exerciseCmd acceptedSwapRequestCid FinalizeSwap
+```
+
+### Error Condition Testing
+
+```daml
+-- Test slippage protection
+testSlippageProtection = do
+  -- Create swap request with tight slippage tolerance
+  -- Modify market rates to exceed tolerance
+  -- Verify swap is automatically rejected
+  submitMustFail lp do
+    exerciseCmd swapRequestCid AcceptSwap with
+      outputTokenLedgerKey = outputKey
 ```
 
 ### Common Test Utilities
@@ -140,6 +253,15 @@ import DA.Assert
 
 ### Module-Specific Imports
 
+```daml
+-- For swap-related modules
+import Registry.PartyRegistryUtils
+import Currency.TokenLedger
+import Exchange.TokenPair
+import Exchange.TokenSwapUtils
+import Scripts.SwapUtils
+```
+
 - Import utilities from corresponding Utils modules
 - Import test-specific modules only in test files
 
@@ -148,23 +270,51 @@ import DA.Assert
 ### Template Documentation
 
 ```daml
--- | Represents a fungible token balance for a holder
+-- | Represents a swap request with enhanced slippage protection
 -- |
 -- | Key Features:
--- | - Privacy: Only holder and owner can see
--- | - Validation: Non-negative amounts, sufficient balance
--- | - Transfer: Two-step lock/accept pattern
-template TokenLedger
+-- | - Configurable slippage tolerance (0-100%)
+-- | - Two-phase execution (LP accept, swapper finalize)
+-- | - Direction-aware output calculation
+-- | - Real-time rate validation
+template SwapRequest
 ```
 
 ### Choice Documentation
 
 ```daml
--- | Initiates a token transfer by locking tokens for a recipient
--- | Creates a TokenTransferLock contract that must be accepted/rejected
-choice LockTokenForTransfer
+-- | LP accepts swap with real-time slippage validation
+-- | Locks output tokens and immediately receives input tokens
+-- | Updates SwapRequest with output lock for swapper finalization
+choice AcceptSwap
 ```
 
-description: Coding standards
-globs: *.daml
----
+### Utility Function Documentation
+
+```daml
+-- | Calculate expected output amount with direction awareness
+-- | Handles both input->quote and quote->input token flows
+-- | Uses appropriate buying/selling price based on direction
+calculateExpectedOutputAmount: Text -> TokenPair -> Decimal -> Decimal
+```
+
+## Slippage Protection Best Practices
+
+### Slippage Tolerance Configuration
+
+- Always validate slippage tolerance is between 0.0 and 1.0
+- Use `rangeValidation` function for consistent validation
+- Provide clear error messages for invalid ranges
+
+### Real-time Rate Validation
+
+- Fetch current TokenPair rates at time of LP acceptance
+- Calculate minimum acceptable amount based on slippage tolerance
+- Reject swaps that exceed tolerance automatically
+
+### Direction-Aware Calculations
+
+- Use token symbol to determine calculation direction
+- Apply buying price for input token purchases
+- Apply selling price for input token sales
+- Ensure consistent rate application across all calculations
