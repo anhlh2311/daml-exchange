@@ -178,61 +178,91 @@ This document contains comprehensive user stories for the DAML Token Exchange Sy
 
 ### Swapper Stories
 
-**US-SW-001: Swap Initiation**
+**US-SW-001: Swap Initiation with Slippage Protection**
 
 - **As a** Swapper
-- **I want to** initiate a token swap using createSwapWithTokenLocking
-- **So that** I can exchange my tokens for other tokens at current market rates
+- **I want to** initiate a token swap using createSwapWithTokenLocking with configurable slippage tolerance
+- **So that** I can exchange my tokens for other tokens while protecting against unfavorable rate changes
 
-**US-SW-002: Swap Confirmation**
-
-- **As a** Swapper
-- **I want to** confirm a swap by calling ConfirmSwap on the LiquidityResponse
-- **So that** I can complete the token exchange transaction
-
-**US-SW-003: Swap Cancellation**
+**US-SW-002: Enhanced Output Calculation**
 
 - **As a** Swapper
-- **I want to** cancel a pending swap using CancelSwap
+- **I want to** see the expected output amount calculated using calculateExpectedOutputAmount with direction awareness
+- **So that** I know exactly how many tokens I will receive based on current rates and token flow direction
+
+**US-SW-003: Swap Finalization**
+
+- **As a** Swapper
+- **I want to** finalize a swap by calling FinalizeSwap on the SwapRequest after LP acceptance
+- **So that** I can complete the token exchange transaction in the two-phase execution model
+
+**US-SW-004: Swap Cancellation**
+
+- **As a** Swapper
+- **I want to** cancel a pending swap using CancelSwapRequest
 - **So that** I can retrieve my locked tokens if the swap is not proceeding as expected
 
-**US-SW-004: Rate Validation**
+**US-SW-005: Rate Validation with Slippage**
 
 - **As a** Swapper
-- **I want to** have my swap amounts validated against current TokenPair rates
-- **So that** I receive fair pricing based on current market conditions
+- **I want to** have my swap amounts validated against current TokenPair rates with slippage tolerance
+- **So that** I receive fair pricing based on current market conditions within my acceptable range
 
-**US-SW-005: Expected Output Calculation**
+**US-SW-006: Slippage Tolerance Configuration**
 
 - **As a** Swapper
-- **I want to** see the expected output amount calculated using calculateSellingAmount
-- **So that** I know exactly how many tokens I will receive for my swap
+- **I want to** set my slippage tolerance percentage (0-100%) when initiating swaps
+- **So that** I can control how much rate deviation I'm willing to accept
+
+**US-SW-007: Token Recovery from Rejection**
+
+- **As a** Swapper
+- **I want to** recover my tokens when a LP rejects my swap request
+- **So that** I can reclaim my locked tokens through the reverse lock mechanism
 
 ### Liquidity Provider Stories
 
-**US-LP-001: Swap Request Review**
+**US-LP-001: Direct Swap Request Review**
 
 - **As a** Liquidity Provider
-- **I want to** review incoming SwapRequest contracts
-- **So that** I can evaluate swap opportunities and decide whether to provide liquidity
+- **I want to** review incoming SwapRequest contracts directly
+- **So that** I can evaluate swap opportunities and decide whether to provide liquidity without intermediate templates
 
-**US-LP-002: Liquidity Provision**
-
-- **As a** Liquidity Provider
-- **I want to** lock output tokens via TokenTransferLock for swappers
-- **So that** I can provide liquidity for token swaps
-
-**US-LP-003: Liquidity Response Creation**
+**US-LP-002: Swap Acceptance with Rate Validation**
 
 - **As a** Liquidity Provider
-- **I want to** create LiquidityResponse contracts with output token locks
-- **So that** I can participate in swap transactions
+- **I want to** accept swaps using AcceptSwap on SwapRequest with real-time rate validation
+- **So that** I can provide liquidity while ensuring current rates are within the swapper's slippage tolerance
 
-**US-LP-004: Swap Rejection**
+**US-LP-003: Immediate Token Exchange**
 
 - **As a** Liquidity Provider
-- **I want to** reject swap requests using RejectSwap
-- **So that** I can decline participation in unfavorable swap opportunities
+- **I want to** receive input tokens immediately when accepting a swap
+- **So that** I can complete my side of the transaction in the first phase of the two-phase execution
+
+**US-LP-004: Output Token Locking**
+
+- **As a** Liquidity Provider
+- **I want to** lock output tokens for the swapper when accepting a swap
+- **So that** I can ensure the swapper can complete the transaction in the second phase
+
+**US-LP-005: Swap Rejection with Recovery**
+
+- **As a** Liquidity Provider
+- **I want to** reject swap requests using RejectSwapRequest
+- **So that** I can decline participation in unfavorable swap opportunities while providing token recovery for the swapper
+
+**US-LP-006: Slippage-based Automatic Rejection**
+
+- **As a** Liquidity Provider
+- **I want to** have swaps automatically rejected when current rates exceed the swapper's slippage tolerance
+- **So that** I can avoid executing swaps that would be unfavorable to the swapper
+
+**US-LP-007: Balance Validation**
+
+- **As a** Liquidity Provider
+- **I want to** have my token balance validated before accepting swaps
+- **So that** I can ensure I have sufficient tokens to complete the swap transaction
 
 ---
 
@@ -246,11 +276,11 @@ This document contains comprehensive user stories for the DAML Token Exchange Sy
 - **I want to** have all my operations validated against the PartyRegistry
 - **So that** only registered parties can participate in system activities
 
-**US-SYS-002: Atomic Swap Execution**
+**US-SYS-002: Two-Phase Atomic Swap Execution**
 
 - **As a** System User
-- **I want to** have swaps execute both sides simultaneously or fail completely
-- **So that** I can ensure system consistency and prevent partial states
+- **I want to** have swaps execute in two atomic phases (LP acceptance and swapper finalization)
+- **So that** I can ensure system consistency and prevent partial states while maintaining security
 
 **US-SYS-003: Secure Token Transfers**
 
@@ -269,3 +299,99 @@ This document contains comprehensive user stories for the DAML Token Exchange Sy
 - **As a** System User
 - **I want to** have critical operations require multiple party authorization
 - **So that** I can ensure security and prevent unauthorized actions
+
+**US-SYS-006: Slippage Protection System**
+
+- **As a** System User
+- **I want to** have automatic slippage protection that validates current rates against my tolerance
+- **So that** I can prevent execution of swaps with unfavorable rate changes
+
+**US-SYS-007: Enhanced Rate Calculation**
+
+- **As a** System User
+- **I want to** have direction-aware rate calculations that handle input vs quote token scenarios
+- **So that** I can receive accurate pricing regardless of which token I'm trading
+
+**US-SYS-008: Simplified Swap Architecture**
+
+- **As a** System User
+- **I want to** interact with a single SwapRequest template for all swap operations
+- **So that** I can have a streamlined experience without managing multiple contract types
+
+**US-SYS-009: Real-time Rate Validation**
+
+- **As a** System User
+- **I want to** have current market rates validated at the time of swap acceptance
+- **So that** I can ensure fair pricing based on the most recent market conditions
+
+**US-SYS-010: Graceful Error Recovery**
+
+- **As a** System User
+- **I want to** have multiple recovery paths when swaps fail or are rejected
+- **So that** I can always reclaim my tokens and have clear options for resolution
+
+---
+
+## 6. Updated Swap Design Features
+
+### Enhanced Swap Architecture Stories
+
+**US-UPD-001: Simplified Contract Management**
+
+- **As a** System User
+- **I want to** work with a single SwapRequest template instead of multiple contract types
+- **So that** I can have a simpler, more intuitive swap experience
+
+**US-UPD-002: Direct LP Interaction**
+
+- **As a** Liquidity Provider
+- **I want to** interact directly with SwapRequest contracts without intermediate templates
+- **So that** I can respond to swap requests more efficiently
+
+**US-UPD-003: Configurable Slippage Tolerance**
+
+- **As a** Swapper
+- **I want to** set my slippage tolerance percentage (0-100%) when creating swap requests
+- **So that** I can control the acceptable range of rate deviation for my trades
+
+**US-UPD-004: Real-time Slippage Validation**
+
+- **As a** Liquidity Provider
+- **I want to** have swap requests automatically validated against current rates and slippage tolerance
+- **So that** I can ensure swaps are executed fairly without manual rate checking
+
+**US-UPD-005: Direction-Aware Output Calculation**
+
+- **As a** System User
+- **I want to** have output amounts calculated based on token direction (input vs quote token)
+- **So that** I can receive accurate pricing regardless of which tokens I'm trading
+
+**US-UPD-006: Two-Phase Execution Safety**
+
+- **As a** System User
+- **I want to** have swaps execute in two distinct phases (LP acceptance and swapper finalization)
+- **So that** I can ensure both parties complete their obligations before the swap is finalized
+
+**US-UPD-007: Automatic Slippage Rejection**
+
+- **As a** Liquidity Provider
+- **I want to** have swaps automatically rejected when current rates exceed the swapper's tolerance
+- **So that** I don't need to manually check rates and can avoid unfavorable executions
+
+**US-UPD-008: Enhanced Token Recovery**
+
+- **As a** Swapper
+- **I want to** have multiple recovery options when swaps are rejected or cancelled
+- **So that** I can always reclaim my tokens through reverse locks or cancellation mechanisms
+
+**US-UPD-009: Immediate Token Exchange for LPs**
+
+- **As a** Liquidity Provider
+- **I want to** receive input tokens immediately when accepting a swap
+- **So that** I can complete my side of the transaction in the first phase
+
+**US-UPD-010: Streamlined Swap Choices**
+
+- **As a** System User
+- **I want to** use simplified swap choices (AcceptSwap, FinalizeSwap, CancelSwapRequest, RejectSwapRequest)
+- **So that** I can navigate the swap process with clear, intuitive actions

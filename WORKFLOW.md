@@ -208,107 +208,127 @@ graph TD
 
 #### Core Components
 
-- **SwapRequest**: Manages swap initiation and execution logic
-- **LiquidityResponse**: Handles liquidity provider participation
+- **SwapRequest**: Manages complete swap lifecycle with direct LP interaction
 - **TokenTransferLock**: Secures tokens during swap process
-- **SwapUtils**: Utility functions for swap calculations and validation
+- **TokenSwapUtils**: Enhanced utility functions for swap calculations and validation
+- **SwapUtils**: Script utilities for swap creation and management
 
 #### Workflow
 
 ##### Swap Initiation
 
 - **Swapper** calls `createSwapWithTokenLocking` utility function which:
-   - Validates the TokenPair exists and is active
-   - Locks input tokens via `TokenTransferLock` for the liquidity provider
-   - Creates `SwapRequest` with swap details and expected output amount
+  - Validates the TokenPair exists and is active
+  - Calculates expected output amount using `calculateExpectedOutputAmount`
+  - Locks input tokens via `TokenTransferLock` for the liquidity provider
+  - Creates `SwapRequest` with swap details, expected output amount, and slippage tolerance
 
-##### Liquidity Provider Response
+##### Direct Liquidity Provider Response
 
-- **Liquidity Provider** reviews the `SwapRequest`
-- **Liquidity Provider** locks output tokens for the swapper via `TokenTransferLock`
-- **Liquidity Provider** creates `LiquidityResponse` with the output token lock
+- **Liquidity Provider** reviews the `SwapRequest` directly
+- **Liquidity Provider** validates current market rates against swap request
+- **Liquidity Provider** can choose:
+  - `AcceptSwap`: Directly accepts and processes the swap in one step
+  - `RejectSwapRequest`: Declines and creates reverse lock for swapper recovery
 
-##### Swap Execution
+##### Two-Phase Swap Execution
 
-- **Swapper** calls `ConfirmSwap` on the `LiquidityResponse`
-- **LiquidityResponse** calls `ExecuteSwap` on the original `SwapRequest`
-- System validates amounts against current exchange rates from the TokenPair
-- Both token locks are accepted simultaneously
-- Tokens are distributed to both parties, completing the swap
+**Phase 1 - LP Acceptance:**
+
+- **Liquidity Provider** calls `AcceptSwap` choice on `SwapRequest`
+- System validates current rates against slippage tolerance
+- LP's output tokens are locked for the swapper
+- LP immediately receives input tokens from the locked transfer
+- SwapRequest is updated with output token lock information
+
+**Phase 2 - Swapper Finalization:**
+
+- **Swapper** calls `FinalizeSwap` choice on the updated `SwapRequest`
+- Swapper receives the locked output tokens
+- Swap is completed atomically
 
 ##### Cancellation and Rejection Flows
 
-- **Swapper** can `CancelSwap` to retrieve their locked tokens
-- **Liquidity Provider** can `RejectSwap` to decline participation
+- **Swapper** can `CancelSwapRequest` to retrieve their locked tokens
+- **Liquidity Provider** can `RejectSwapRequest` to create reverse lock for swapper
 - All cancellations return tokens to their original holders safely
 
-##### Rate Validation
+##### Enhanced Rate Validation
 
-- Swap amounts are validated against current TokenPair selling/buying prices
-- Expected output is calculated using `calculateSellingAmount` utility
-- Required input is calculated using `calculateBuyingAmount` utility
+- Swap amounts validated using `calculateExpectedOutputAmount` with direction awareness
+- Slippage tolerance enforced during LP acceptance
+- Current TokenPair rates checked at time of LP decision
+- Rate direction automatically handled (input token vs quote token)
 
 ##### Diagram
 
 ```mermaid
 graph TD
-    %% Swap Initiation
+    %% Swap Initiation by Swapper
     S[Swapper] -->|createSwapWithTokenLocking| SS[SwapUtils]
     SS -->|Validates TokenPair Exists| TP[TokenPair]
+    SS -->|Calculate Expected Output| TSU[TokenSwapUtils]
     SS -->|Lock Input Tokens| ITL[Input TokenTransferLock]
-    SS -->|Create| SR[SwapRequest]
+    SS -->|Creates| SR[SwapRequest]
     
-    %% Liquidity Provider Response
-    LP[Liquidity Provider] -->|Reviews SwapRequest| SR
-    LP -->|Lock Output Tokens| OTL[Output TokenTransferLock]
-    LP -->|Create| LRS[LiquidityResponse]
+    %% LP Directly Reviews SwapRequest
+    SR -->|LP Reviews Directly| LP[Liquidity Provider]
+    LP -->|Checks Current Rates| TP
+    LP -->|Makes Decision on| SR
     
-    %% Swap Execution
-    S -->|ConfirmSwap| LRS
-    LRS -->|ExecuteSwap| SR
-    SR -->|Validates Amounts & Rates| TP
-    SR -->|Accept Input Lock| ITL
-    SR -->|Accept Output Lock| OTL
-    SR -->|Complete| CS[Completed Swap]
+    %% LP Decision Point
+    LP -->|Decides| LPDEC{Accept or Reject SwapRequest?}
     
-    %% Final Token Distribution
-    CS -->|Tokens to Swapper| STL[Swapper TokenLedger]
-    CS -->|Tokens to LP| LPTL[LP TokenLedger]
+    %% LP Acceptance Flow - Direct on SwapRequest
+    LPDEC -->|Calls AcceptSwap on| SR
+    SR -->|AcceptSwap Choice Validates| SLIP[Slippage Check vs Current Rates]
+    SLIP -->|Slippage OK| ACCEPT[LP Locks Output & Gets Input]
+    SLIP -->|Slippage Exceeded| REJ[Auto-Reject Swap]
+    ACCEPT -->|Updates| SRMOD[SwapRequest with Output Lock Set]
     
-    %% Cancellation and Rejection Flows
-    SR -->|CancelSwap| CR[Cancel Input Lock]
-    CR -->|Return Tokens| STL2[Swapper Gets Tokens Back]
-    LP -->|RejectSwap| RSR[Reject SwapRequest]
-    RSR -->|Swapper Can Cancel| CR
+    %% LP Rejection Flow - Direct on SwapRequest  
+    LPDEC -->|Calls RejectSwapRequest on| SR
+    SR -->|RejectSwapRequest Choice Creates| REJLOCK[Reverse Lock for Swapper]
     
-    %% Rate Validation
-    TP -->|Provides Current Rates| SR
-    SR -->|Validates Expected Output| TP
+    %% Swapper Finalization - Direct on SwapRequest
+    SRMOD -->|Swapper Calls FinalizeSwap on| SR
+    SR -->|FinalizeSwap Choice| STL[Swapper Gets Output Tokens]
     
-    %% Utility Functions
-    SU[SwapUtils] -->|calculateSellingAmount| SR
-    SU -->|calculateBuyingAmount| SR
-    SU -->|validateSwapAmounts| SR
+    %% Swapper Cancellation - Direct on SwapRequest
+    SR -->|Swapper Calls CancelSwapRequest on| SR
+    SR -->|CancelSwapRequest Choice| CR[Cancel Input Lock]
+    CR -->|Returns Tokens to| STL2[Swapper]
+    
+    %% Enhanced Utilities
+    TSU -->|calculateExpectedOutputAmount| SR
+    TSU -->|Direction-aware Calculation| TP
+    TSU -->|rangeValidation for Slippage| SR
+    
+    %% Recovery Paths
+    REJLOCK -->|Swapper Can Reclaim via| ITL2[Token Recovery]
+    REJ -->|Swapper Can Cancel via| CR
     
     %% Dependencies
-    PR[PartyRegistry] -.->|Validates All Parties| SR
     CM[Currency Management] -.->|Provides Token Locks| SS
     TL[TokenListing] -.->|Ensures Tokens Are Listed| TP
     
     %% Styling
     classDef user fill:#f3e5f5
-    classDef exchange fill:#fff3e0
+    classDef swapRequest fill:#fff3e0
     classDef system fill:#f0f0f0
     classDef validation fill:#ffeb3b
     classDef success fill:#c8e6c9
     classDef cancel fill:#ffcdd2
     classDef utility fill:#e8f5e8
+    classDef decision fill:#e1f5fe
     
     class S,LP user
-    class SS,SR,LRS,SU exchange
-    class ITL,OTL,STL,LPTL,CS,TP system
-    class STL2,CR,RSR cancel
-    class PR,CM,TL validation
+    class SR swapRequest
+    class SS,TSU,TP,SRMOD system
+    class ITL,STL,STL2,ACCEPT success
+    class CR,REJ,REJLOCK,ITL2 cancel
+    class CM,TL validation
+    class LPDEC,SLIP decision
 ```
 
 ## Key Design Patterns
@@ -343,20 +363,55 @@ graph TD
 - Token transfers are atomic (lock → accept → ledger update)
 - Maintains system consistency and prevents partial states
 
-### 6. Simplified Swap Workflow
+### 6. Enhanced Swap Workflow
 
-- Direct approach using `SwapRequest` and `LiquidityResponse` templates
-- Utility functions in `SwapUtils` handle complex calculations and validations
-- Streamlined execution flow reduces complexity while maintaining security
-- Rate validation ensures fair pricing based on current TokenPair rates
+- **Simplified Architecture**: Single `SwapRequest` template handles complete swap lifecycle
+- **Direct LP Interaction**: Liquidity providers interact directly with SwapRequest
+- **Two-Phase Execution**: LP acceptance followed by swapper finalization
+- **Slippage Protection**: Configurable tolerance with real-time validation
+- **Enhanced Calculations**: Direction-aware output calculation with `calculateExpectedOutputAmount`
+- **Atomic Operations**: Both phases must complete for successful swap execution
+
+## Updated Swap Design Features
+
+### 1. Simplified Architecture
+
+- **Single Template Approach**: Removed `LiquidityResponse` template for direct `SwapRequest` interaction
+- **Streamlined Choices**: `AcceptSwap`, `FinalizeSwap`, `CancelSwapRequest`, `RejectSwapRequest`
+- **Reduced Complexity**: Fewer contracts to manage while maintaining security
+
+### 2. Enhanced Slippage Protection
+
+- **Configurable Tolerance**: Swappers set acceptable slippage percentage (0-100%)
+- **Real-time Validation**: Current rates checked against tolerance at LP acceptance time
+- **Automatic Rejection**: Swaps exceeding tolerance are automatically rejected
+
+### 3. Improved Calculation Logic
+
+- **Direction-Aware Calculations**: `calculateExpectedOutputAmount` handles input vs quote token direction
+- **Dynamic Rate Application**: Proper buying/selling price selection based on token flow
+- **Range Validation**: Ensures slippage tolerance within acceptable bounds
+
+### 4. Two-Phase Execution Model
+
+- **Phase 1 (LP Accept)**: LP validates, locks output tokens, receives input tokens immediately
+- **Phase 2 (Swapper Finalize)**: Swapper accepts output tokens to complete swap
+- **Atomic Phases**: Each phase is atomic, preventing partial state inconsistencies
+
+### 5. Enhanced Error Recovery
+
+- **Reverse Lock Creation**: LP rejection creates automatic recovery path for swappers
+- **Multiple Cancel Options**: Swappers can cancel at different stages
+- **Graceful Degradation**: System handles various failure scenarios with token recovery
 
 ## Security Considerations
 
 1. **Registry Validation**: All operations check party registration status
 2. **Multi-party Signatures**: Critical operations require multiple party authorization
 3. **Lock Mechanism**: Prevents accidental or malicious token transfers
-4. **Rate Validation**: Swap amounts are validated against current exchange rates
+4. **Enhanced Rate Validation**: Swap amounts validated with slippage protection
 5. **Active Listing Checks**: Ensures only valid tokens participate in trading
+6. **Slippage Protection**: Prevents execution of swaps with unfavorable rate changes
 
 ## Complete System Usage Flow
 
@@ -365,8 +420,9 @@ graph TD
 3. **Exchange Listing**: Token owners request listing; admin reviews and approves active tokens
 4. **Trading Infrastructure**: Admin creates trading pairs with initial exchange rates
 5. **Token Trading**:
-   - Users call `createSwapWithTokenLocking` to initiate swaps
-   - Liquidity providers create `LiquidityResponse` with locked output tokens
-   - Swappers confirm swaps through `ConfirmSwap` choice
-   - Trades execute atomically with rate validation
+   - Users call `createSwapWithTokenLocking` to initiate swaps with slippage tolerance
+   - Liquidity providers directly accept or reject swaps through `SwapRequest` choices
+   - LP acceptance locks output tokens and immediately transfers input tokens
+   - Swappers finalize swaps through `FinalizeSwap` choice
+   - Trades execute in two atomic phases with enhanced rate validation
 6. **Ongoing Management**: Rate updates, token supply management, and system maintenance

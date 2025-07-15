@@ -248,7 +248,7 @@ flowchart TD
     C --> D[Select Input Token]
     D --> E[Enter Input Amount]
     E --> F[Select Output Token]
-    F --> G[View Calculated Output]
+    F --> G[Auto-Calculate Expected Output]
     G --> H[Review Exchange Rate]
     H --> I[Set Slippage Tolerance]
     I --> J[Click Execute Swap]
@@ -256,10 +256,19 @@ flowchart TD
     K -->|Yes| L[Lock Input Tokens]
     K -->|No| M[Show Error Message]
     M --> C
-    L --> N[Create SwapRequest]
-    N --> O[Wait for LP Response]
-    O --> P[Show Swap Initiated]
-    P --> Q[Return to Dashboard]
+    L --> N[Create SwapRequest with Slippage]
+    N --> O[Monitor Swap Status]
+    O --> P[Show Swap Pending]
+    P --> Q[Wait for LP Decision]
+    Q --> R{LP Decision?}
+    R -->|Accept| S[LP Processes Swap]
+    R -->|Reject| T[Show Rejection Message]
+    S --> U[Finalize Swap Button Available]
+    T --> V[Option to Cancel & Reclaim]
+    U --> W[Click Finalize Swap]
+    W --> X[Complete Swap Transaction]
+    X --> Y[Show Success & Return to Dashboard]
+    V --> Z[Return to Dashboard]
 ```
 
 ## 4. Liquidity Provider Workflow
@@ -272,20 +281,25 @@ flowchart TD
     B --> C[View Pending Swap Requests]
     C --> D[Select Swap Request]
     D --> E[Review Swap Details]
-    E --> F{Accept Swap?}
-    F -->|Yes| G[Click Accept]
-    F -->|No| H[Click Reject]
-    G --> I[Lock Output Tokens]
-    H --> J[Reject Swap Request]
-    I --> K[Create LiquidityResponse]
-    J --> L[Archive SwapRequest]
-    K --> M[Wait for Swapper Confirmation]
-    L --> N[Show Rejection Notification]
-    M --> O[Execute Swap]
-    N --> P[Return to Dashboard]
-    O --> Q[Update Token Balances]
-    Q --> R[Show Success Notification]
-    R --> P
+    E --> F[Check Current Market Rates]
+    F --> G[Verify Slippage Tolerance]
+    G --> H{Accept Swap?}
+    H -->|Yes| I[Click Accept Swap]
+    H -->|No| J[Click Reject Swap]
+    I --> K[Validate Current Rates vs Slippage]
+    J --> L[Create Reverse Lock for Swapper]
+    K --> M{Slippage Within Limits?}
+    M -->|Yes| N[Lock Output Tokens for Swapper]
+    M -->|No| O[Reject Due to Slippage]
+    N --> P[Accept Input Tokens from Swapper]
+    O --> Q[Show Slippage Error]
+    P --> R[Update LP Token Balance]
+    L --> S[Show Rejection Notification]
+    R --> T[Notify Swapper to Finalize]
+    Q --> U[Return to Dashboard]
+    S --> U
+    T --> V[Show Success Notification]
+    V --> U
 ```
 
 ### 4.2 Swap History Management Flow
@@ -306,29 +320,30 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[Swapper Initiates Swap] --> B[Lock Input Tokens]
-    B --> C[Create SwapRequest]
-    C --> D[LP Reviews Request]
-    D --> E{LP Accepts?}
-    E -->|Yes| F[LP Locks Output Tokens]
-    E -->|No| G[LP Rejects Swap]
-    F --> H[Create LiquidityResponse]
-    G --> I[Swapper Can Cancel]
-    H --> J[Swapper Confirms Swap]
-    I --> K[Return Tokens to Swapper]
-    J --> L[Execute Atomic Swap]
-    K --> M[Update Token Balances]
-    L --> N[Validate Exchange Rates]
-    M --> O[Show Success Notification]
-    N --> O{Validation Passed?}
-    O -->|Yes| P[Complete Swap]
-    O -->|No| Q[Rollback Swap]
-    P --> R[Update Both Token Ledgers]
-    Q --> S[Return Tokens to Original Holders]
-    R --> T[Show Success Notification]
-    S --> U[Show Error Notification]
-    T --> V[Return to Dashboard]
+    A[Swapper Initiates Swap] --> B[Calculate Expected Output]
+    B --> C[Lock Input Tokens]
+    C --> D[Create SwapRequest with Slippage]
+    D --> E[LP Reviews Request]
+    E --> F{LP Decision?}
+    F -->|Accept| G[LP Accepts Swap]
+    F -->|Reject| H[LP Rejects Swap]
+    G --> I[Validate Current Rates]
+    H --> J[Create Reverse Lock]
+    I --> K{Slippage Check Passed?}
+    K -->|Yes| L[LP Locks Output Tokens]
+    K -->|No| M[Reject Due to Slippage]
+    L --> N[LP Receives Input Tokens]
+    M --> O[Swapper Can Cancel]
+    N --> P[Swapper Finalizes Swap]
+    O --> Q[Return Tokens to Swapper]
+    P --> R[Swapper Receives Output Tokens]
+    Q --> S[Show Rejection Notification]
+    R --> T[Update Both Token Balances]
+    T --> U[Show Success Notification]
+    S --> V[Return to Dashboard]
     U --> V
+    J --> W[Swapper Can Reclaim Tokens]
+    W --> V
 ```
 
 ## 6. Error Handling and Recovery Flows
@@ -358,22 +373,30 @@ flowchart TD
 ```mermaid
 flowchart TD
     A[Swap Error Occurs] --> B{Error Type?}
-    B -->|Rate Slippage| C[Show Slippage Warning]
-    B -->|Insufficient Liquidity| D[Show Liquidity Error]
+    B -->|Rate Slippage Exceeded| C[Show Slippage Warning]
+    B -->|Insufficient LP Balance| D[Show Liquidity Error]
     B -->|Token Pair Inactive| E[Show Pair Error]
-    C --> F[Suggest New Rate]
-    D --> G[Suggest Lower Amount]
-    E --> H[Suggest Alternative Pair]
-    F --> I[Retry with New Rate]
-    G --> J[Retry with Lower Amount]
-    H --> K[Switch to Alternative Pair]
-    I --> L{Retry Successful?}
-    J --> L
-    K --> L
-    L -->|Yes| M[Complete Swap]
-    L -->|No| N[Cancel Swap]
-    M --> O[Show Success Notification]
-    N --> P[Return Tokens to Swapper]
+    B -->|LP Rejection| F[Show Rejection Message]
+    C --> G[Suggest Higher Slippage Tolerance]
+    D --> H[Suggest Lower Amount]
+    E --> I[Suggest Alternative Pair]
+    F --> J[Option to Cancel & Reclaim]
+    G --> K[Retry with New Tolerance]
+    H --> L[Retry with Lower Amount]
+    I --> M[Switch to Alternative Pair]
+    J --> N[Cancel SwapRequest]
+    K --> O{Retry Successful?}
+    L --> O
+    M --> O
+    N --> P[Reclaim Locked Tokens]
+    O -->|Yes| Q[Complete Swap]
+    O -->|No| R[Offer Manual Cancel]
+    Q --> S[Show Success Notification]
+    R --> T[Cancel & Return Tokens]
+    P --> U[Show Cancellation Notification]
+    S --> V[Return to Dashboard]
+    T --> U
+    U --> V
 ```
 
 ## 7. System Integration Flows
@@ -515,6 +538,39 @@ flowchart TD
     J --> L[Suggest Corrections]
 ```
 
+## Updated Swap Design Features
+
+### 1. Simplified Swap Architecture
+
+- **Removed LiquidityResponse Template**: Direct interaction through SwapRequest only
+- **Streamlined Choices**: `AcceptSwap`, `FinalizeSwap`, `CancelSwapRequest`, `RejectSwapRequest`
+- **Single Contract Management**: All swap logic contained within SwapRequest template
+
+### 2. Enhanced Slippage Protection
+
+- **Configurable Slippage Tolerance**: Swappers set their acceptable slippage percentage
+- **Real-time Rate Validation**: LPs validate current rates against expected amounts
+- **Automatic Slippage Checks**: System prevents swaps exceeding tolerance limits
+
+### 3. Improved Calculation Logic
+
+- **Dynamic Output Calculation**: `calculateExpectedOutputAmount` based on token direction
+- **Rate Direction Awareness**: Different calculations for input vs quote tokens
+- **Range Validation**: Ensures slippage tolerance within acceptable bounds (0-100%)
+
+### 4. Two-Phase Swap Execution
+
+- **Phase 1 - LP Accept**: LP locks output tokens and receives input tokens immediately
+- **Phase 2 - Swapper Finalize**: Swapper completes swap by accepting output tokens
+- **Atomic Completion**: Both phases must complete for successful swap
+
+### 5. Enhanced Error Handling
+
+- **Slippage Rejection**: Automatic rejection when market moves beyond tolerance
+- **Reverse Lock Creation**: LP rejection creates recovery path for swapper
+- **Balance Validation**: LP balance checked before accepting swaps
+- **Rate Drift Protection**: Current rates validated at time of acceptance
+
 ## Key Design Principles
 
 ### 1. User-Centric Design
@@ -522,29 +578,41 @@ flowchart TD
 - Role-based dashboards provide relevant information and actions
 - Intuitive navigation between different system areas
 - Clear feedback for all user actions
+- Real-time slippage and rate information
 
 ### 2. Security-First Approach
 
 - All operations validate party registration
 - Two-step approval processes for critical operations
 - Lock-based token transfers prevent unauthorized access
+- Slippage protection prevents unfavorable swaps
 
 ### 3. Atomic Operations
 
 - Swaps execute completely or fail entirely
 - Token transfers are atomic with explicit acceptance
 - System maintains consistency across all operations
+- Two-phase swap completion ensures both parties benefit
 
 ### 4. Real-time Updates
 
 - Dashboard panels update automatically
 - Notifications provide immediate feedback
 - Data tables reflect current system state
+- Live rate validation and slippage monitoring
 
 ### 5. Error Recovery
 
 - Comprehensive error handling and recovery flows
 - User-friendly error messages with actionable suggestions
 - Graceful degradation when operations fail
+- Multiple recovery paths for different error scenarios
 
-This comprehensive user flow chart provides a complete view of how users interact with the DAML Token Exchange System, from initial login through complex swap operations, ensuring a smooth and secure user experience across all roles and scenarios.
+### 6. Market-Responsive Design
+
+- Dynamic rate calculations based on current market conditions
+- Configurable slippage tolerance for market volatility
+- Real-time validation prevents stale rate execution
+- Flexible rate direction handling for different token pairs
+
+This comprehensive user flow chart provides a complete view of how users interact with the updated DAML Token Exchange System, featuring the new simplified swap architecture with enhanced slippage protection and improved error recovery mechanisms.
