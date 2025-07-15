@@ -256,8 +256,17 @@
             color: #383d41;
         }
 
+        .status-accepted {
+            background: #cce5ff;
+            color: #004085;
+        }
+
         .pending-row {
             background-color: #fff3cd;
+        }
+
+        .accepted-row {
+            background-color: #cce5ff;
         }
 
         .action-buttons {
@@ -593,7 +602,7 @@
                         <div class="stat-label">Pending Transfers</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-number">2</div>
+                        <div class="stat-number">3</div>
                         <div class="stat-label">Active Swaps</div>
                     </div>
                 </div>
@@ -612,6 +621,81 @@
                         <p>Exchange tokens for other tokens</p>
                         <button class="btn">Start Swap</button>
                     </div>
+                </div>
+            </div>
+
+            <div class="panel" style="grid-column: 1 / -1;">
+                <h3>My Swap Requests</h3>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th class="column-token">From</th>
+                                <th class="column-token">To</th>
+                                <th class="column-amount">Input Amount</th>
+                                <th class="column-amount">Expected Output</th>
+                                <th class="column-counterparty">Liquidity Provider</th>
+                                <th class="column-status">Status</th>
+                                <th class="column-action">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Pending Swap Requests -->
+                            <tr class="pending-row">
+                                <td><strong>USDT</strong></td>
+                                <td><strong>BTC</strong></td>
+                                <td>1095.12</td>
+                                <td>0.010000</td>
+                                <td>LiquidityProvider</td>
+                                <td><span class="status-badge status-pending">Pending</span></td>
+                                <td>
+                                    <button class="btn btn-warning action-buttons">Cancel Swap</button>
+                                </td>
+                            </tr>
+                            <tr class="pending-row">
+                                <td><strong>ETH</strong></td>
+                                <td><strong>USDT</strong></td>
+                                <td>1.5</td>
+                                <td>4165.50</td>
+                                <td>LiquidityProvider</td>
+                                <td><span class="status-badge status-pending">Pending</span></td>
+                                <td>
+                                    <button class="btn btn-warning action-buttons">Cancel Swap</button>
+                                </td>
+                            </tr>
+                            <!-- Accepted Swap Requests -->
+                            <tr class="accepted-row">
+                                <td><strong>BTC</strong></td>
+                                <td><strong>USDT</strong></td>
+                                <td>0.005</td>
+                                <td>547.415</td>
+                                <td>LiquidityProvider</td>
+                                <td><span class="status-badge status-accepted">Accepted</span></td>
+                                <td>
+                                    <button class="btn btn-success action-buttons">Claim</button>
+                                </td>
+                            </tr>
+                            <!-- Completed Swap Requests -->
+                            <tr>
+                                <td>SOL</td>
+                                <td>USDT</td>
+                                <td>10.0</td>
+                                <td>2770.00</td>
+                                <td>LiquidityProvider</td>
+                                <td><span class="status-badge status-active">Completed</span></td>
+                                <td>-</td>
+                            </tr>
+                            <tr>
+                                <td>BNB</td>
+                                <td>BTC</td>
+                                <td>2.0</td>
+                                <td>0.050000</td>
+                                <td>LiquidityProvider</td>
+                                <td><span class="status-badge status-active">Completed</span></td>
+                                <td>-</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 

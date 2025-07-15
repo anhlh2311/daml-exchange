@@ -139,6 +139,92 @@
             box-shadow: 0 5px 15px rgba(0,0,0,0.3);
         }
 
+        .slippage-container {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .slippage-label {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+
+        .slippage-input-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+
+        .slippage-slider {
+            flex: 1;
+            height: 6px;
+            border-radius: 3px;
+            background: #e9ecef;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slippage-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .slippage-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .slippage-input-wrapper {
+            display: flex;
+            align-items: center;
+            position: relative;
+        }
+
+        .slippage-number {
+            width: 80px;
+            padding: 8px 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 1em;
+            text-align: center;
+            background: white;
+        }
+
+        .slippage-number:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .slippage-percent {
+            position: absolute;
+            right: 8px;
+            color: #666;
+            font-weight: 600;
+            pointer-events: none;
+        }
+
+        .slippage-warning {
+            color: #dc3545;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+
         .rate-info {
             background: #f8f9fa;
             padding: 20px;
@@ -272,13 +358,29 @@
                 </div>
             </div>
 
+            <div class="slippage-container">
+                <div class="slippage-label">Slippage Tolerance</div>
+                <div class="slippage-input-container">
+                    <input type="range" class="slippage-slider" id="slippage-slider" 
+                           min="0.1" max="5.0" step="0.1" value="0.5">
+                    <div class="slippage-input-wrapper">
+                        <input type="number" class="slippage-number" id="slippage-number" 
+                               min="0.1" max="5.0" step="0.1" value="0.5">
+                        <span class="slippage-percent">%</span>
+                    </div>
+                </div>
+                <div class="slippage-warning" id="slippage-warning" style="display: none;">
+                    High slippage tolerance may result in unfavorable trades
+                </div>
+            </div>
+
             <div class="rate-info">
                 <div class="rate-display" id="rate-display">Select tokens to see exchange rate</div>
-                <div class="slippage-info">Slippage tolerance: 0.5%</div>
+                <div class="slippage-info">Maximum price impact based on current settings</div>
             </div>
 
             <button class="swap-button" id="swap-button" disabled onclick="executeSwap()">
-                Connect Wallet to Swap
+                Enter token amounts to swap
             </button>
 
             <div class="error-message" id="error-message"></div>
@@ -333,6 +435,7 @@
             const inputToken = document.getElementById('input-token').value;
             const outputToken = document.getElementById('output-token').value;
             const inputAmount = parseFloat(document.getElementById('input-amount').value) || 0;
+            const slippageTolerance = parseFloat(document.getElementById('slippage-number').value) / 100;
 
             if (inputToken && outputToken && inputAmount > 0) {
                 const pairKey = `${inputToken}-${outputToken}`;
@@ -348,11 +451,13 @@
                 }
 
                 const outputAmount = inputAmount * rate;
+                const minimumReceived = outputAmount * (1 - slippageTolerance);
+                
                 document.getElementById('output-amount').value = outputAmount.toFixed(6);
                 
-                // Update rate display
+                // Update rate display with slippage info
                 document.getElementById('rate-display').textContent = 
-                    `1 ${inputToken} = ${rate.toFixed(6)} ${outputToken}`;
+                    `1 ${inputToken} = ${rate.toFixed(6)} ${outputToken} (Minimum: ${minimumReceived.toFixed(6)})`;
                 
                 // Enable swap button if both tokens are selected and amount is valid
                 const swapButton = document.getElementById('swap-button');
@@ -364,7 +469,7 @@
                 document.getElementById('output-amount').value = '';
                 document.getElementById('rate-display').textContent = 'Select tokens to see exchange rate';
                 document.getElementById('swap-button').disabled = true;
-                document.getElementById('swap-button').textContent = 'Connect Wallet to Swap';
+                document.getElementById('swap-button').textContent = 'Enter token amounts to swap';
             }
         }
 
@@ -394,6 +499,7 @@
             const outputToken = document.getElementById('output-token').value;
             const inputAmount = parseFloat(document.getElementById('input-amount').value);
             const outputAmount = parseFloat(document.getElementById('output-amount').value);
+            const slippageTolerance = parseFloat(document.getElementById('slippage-number').value);
 
             if (!inputToken || !outputToken || !inputAmount || !outputAmount) {
                 showError('Please select tokens and enter amounts');
@@ -405,18 +511,17 @@
                 return;
             }
 
-            // Simulate swap execution
-            showSuccess(`Swap executed! ${inputAmount} ${inputToken} for ${outputAmount.toFixed(6)} ${outputToken}`);
+            const minimumReceived = outputAmount * (1 - (slippageTolerance / 100));
+
+            // Simulate swap request submission
+            showSuccess(`Swap request submitted! ${inputAmount} ${inputToken} for ${outputAmount.toFixed(6)} ${outputToken}. Please return to your dashboard to monitor the swap status and wait for liquidity provider approval.`);
             
-            // Update balances (in a real app, this would be done by the blockchain)
-            tokenData[inputToken].balance -= inputAmount;
-            tokenData[outputToken].balance += outputAmount;
-            
-            // Clear inputs
+            // In a real app, the tokens would be locked until the swap is completed
+            // For now, we'll just clear the inputs
             document.getElementById('input-amount').value = '';
             document.getElementById('output-amount').value = '';
             document.getElementById('swap-button').disabled = true;
-            document.getElementById('swap-button').textContent = 'Connect Wallet to Swap';
+            document.getElementById('swap-button').textContent = 'Enter token amounts to swap';
             
             updateBalances();
         }
@@ -443,6 +548,51 @@
             }, 5000);
         }
 
+        function updateSlippageFromSlider() {
+            const slider = document.getElementById('slippage-slider');
+            const numberInput = document.getElementById('slippage-number');
+            const warning = document.getElementById('slippage-warning');
+            
+            numberInput.value = slider.value;
+            
+            // Show warning for high slippage (>2%)
+            if (parseFloat(slider.value) > 2.0) {
+                warning.style.display = 'block';
+            } else {
+                warning.style.display = 'none';
+            }
+            
+            calculateOutput();
+        }
+
+        function updateSlippageFromNumber() {
+            const slider = document.getElementById('slippage-slider');
+            const numberInput = document.getElementById('slippage-number');
+            const warning = document.getElementById('slippage-warning');
+            
+            let value = parseFloat(numberInput.value);
+            
+            // Validate bounds
+            if (value < 0.1) {
+                value = 0.1;
+                numberInput.value = value;
+            } else if (value > 5.0) {
+                value = 5.0;
+                numberInput.value = value;
+            }
+            
+            slider.value = value;
+            
+            // Show warning for high slippage (>2%)
+            if (value > 2.0) {
+                warning.style.display = 'block';
+            } else {
+                warning.style.display = 'none';
+            }
+            
+            calculateOutput();
+        }
+
         // Event listeners
         document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('input-token').addEventListener('change', function() {
@@ -458,6 +608,10 @@
             document.getElementById('input-amount').addEventListener('input', function() {
                 calculateOutput();
             });
+
+            document.getElementById('slippage-slider').addEventListener('input', updateSlippageFromSlider);
+            document.getElementById('slippage-number').addEventListener('input', updateSlippageFromNumber);
+            document.getElementById('slippage-number').addEventListener('blur', updateSlippageFromNumber);
         });
     </script>
 </body>
