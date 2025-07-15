@@ -291,10 +291,34 @@
         .success-message {
             background: #d4edda;
             color: #155724;
-            padding: 15px;
-            border-radius: 8px;
+            padding: 20px;
+            border-radius: 12px;
             margin-top: 15px;
             display: none;
+            border-left: 4px solid #28a745;
+        }
+
+        .success-message.permanent {
+            display: block;
+        }
+
+        .dashboard-link {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .dashboard-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            color: white;
+            text-decoration: none;
         }
 
         @media (max-width: 768px) {
@@ -539,13 +563,16 @@
 
         function showSuccess(message) {
             const successDiv = document.getElementById('success-message');
-            successDiv.textContent = message;
+            successDiv.innerHTML = `
+                ${message}
+                <br/>
+                <a href="wireframe.html#tokenHolder" class="dashboard-link">Go to Token Holder Dashboard</a>
+            `;
+            successDiv.classList.add('permanent');
             successDiv.style.display = 'block';
             document.getElementById('error-message').style.display = 'none';
             
-            setTimeout(() => {
-                successDiv.style.display = 'none';
-            }, 5000);
+            // Make it permanent - no timeout
         }
 
         function updateSlippageFromSlider() {
