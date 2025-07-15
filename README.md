@@ -1,8 +1,154 @@
-# TokenLedger - Daml Fungible Token Template
+# DAML Token Exchange
 
-A robust implementation of a fungible token system in Daml with minting, transfer (with recipient acceptance), and strong privacy guarantees.
+A robust implementation of a fungible token exchange system in DAML with minting, transfer (with recipient acceptance), and strong privacy guarantees.
 
-## Overview
+## Project Overview
+
+This project demonstrates a token exchange platform built with DAML smart contracts, a NestJS backend, and a Next.js frontend.
+
+## Architecture
+
+- **DAML Smart Contracts**: Core business logic for token creation, transfer, and exchange
+- **NestJS Backend**: REST API for interacting with the DAML ledger via JSON API
+- **Next.js Frontend**: User interface for token management with Tailwind CSS styling
+
+## Installation
+
+### Prerequisites
+
+- [DAML SDK](https://docs.daml.com/getting-started/installation.html) (version 2.9.4 or later)
+- Node.js 18 or later (for NestJS backend and React frontend)
+
+### Starting the DAML Ledger
+
+1. Build the DAML project:
+   ```bash
+   cd daml-exchange
+   daml build
+   ```
+
+2. Start the DAML sandbox with the built DAR file:
+   ```bash
+   daml start
+   ```
+   This will start the DAML sandbox on port 7575 (HTTP JSON API) and the ledger API on port 6865.
+
+### Starting the Backend
+
+1. Navigate to the backend directory:
+   ```bash
+   cd backend
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Create a `.env` file based on `.env.example` with the following content:
+   ```
+   DAML_LEDGER_HOST=localhost
+   DAML_LEDGER_PORT=6865
+   DAML_LEDGER_HTTP_PORT=7575
+   JWT_SECRET=your-secret-key
+   PORT=3001
+   NODE_ENV=development
+   ```
+
+4. Start the NestJS application:
+   ```bash
+   npm run start:dev
+   ```
+   The backend will start on port 3001 with context path `/api`.
+
+5. Access the Swagger API documentation at:
+   ```
+   http://localhost:3001/api
+   ```
+
+### Working API Endpoints
+
+The following endpoints are currently working and can be tested via Swagger:
+
+- `GET /api/daml/verify-connection`: Test DAML ledger connection with hardcoded token
+- `GET /api/daml/health`: Check if DAML ledger is accessible
+- `GET /api/daml/ledger-id`: Get the DAML ledger ID
+- `GET /api/tokens/test-template/{templateId}`: Test fetching contracts of any template ID
+
+### Starting the Frontend
+
+1. Navigate to the frontend directory:
+   ```bash
+   cd frontend
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Start the development server:
+   ```bash
+   npm run dev
+   ```
+   The frontend will start on port 3000 and can be accessed at `http://localhost:3000`.
+
+4. For production build:
+   ```bash
+   npm run build
+   npm start
+   ```
+
+## Development Notes
+
+### Authentication
+
+The backend currently uses a hardcoded DAML token with the correct ledger ID "sandbox" for authentication with the DAML ledger. This simplifies development and testing. The token includes these claims:
+
+```json
+{
+  "https://daml.com/ledger-api": {
+    "ledgerId": "sandbox",
+    "applicationId": "daml-exchange-backend",
+    "actAs": ["Alice"]
+  }
+}
+```
+
+### Troubleshooting
+
+#### DAML Ledger Connection Issues
+
+If you encounter connection issues with the DAML ledger:
+
+1. Verify the DAML sandbox is running with `daml start`
+2. Check that ports 6865 (Ledger API) and 7575 (HTTP JSON API) are accessible
+3. Use the `/api/daml/verify-connection` endpoint to test connectivity
+4. Ensure the ledger ID in your token matches the actual ledger ID ("sandbox" for local development)
+
+#### Template ID Format
+
+When querying for DAML contracts, ensure template IDs include the package ID prefix:
+
+```
+<package-id>:<module-name>:<entity-name>
+```
+
+For example: `daml-exchange-0.0.1:Main:TokenLedger`
+
+## Next Steps
+
+- Complete implementation of all token endpoints
+- Add proper user authentication and dynamic token generation
+- Connect the frontend to the NestJS backend
+- Add automated tests for backend endpoints
+
+## Accessing the Application
+
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:3001/api
+- **Swagger Documentation**: http://localhost:3001/api
+- **DAML Navigator**: http://localhost:7500
 
 This project implements a secure and privacy-preserving currency token system following Daml best practices. The system supports:
 
@@ -215,6 +361,43 @@ daml ledger upload-dar .daml/dist/exchange-0.0.1.dar
 
 # Run tests
 daml test --files ./daml/TokenLedgerTest.daml
+```
+
+## Frontend Features
+
+The frontend is built with Next.js and Tailwind CSS, providing a modern and responsive user interface for the DAML token exchange platform.
+
+### Key Features
+
+- **Party Selection**: Dropdown to select different parties (owner, holder, swapper, liquidityProvider, admin)
+- **Dashboard**: Overview of token balances, recent activities, and key statistics
+- **Token Management**: Interface for viewing, transferring, minting, and burning tokens
+- **Exchange Interface**: Token swap functionality with rate display and transaction history
+- **Responsive Design**: Mobile-friendly interface that works across devices
+
+### Technical Implementation
+
+- **Framework**: Next.js with TypeScript
+- **Styling**: Tailwind CSS for utility-first styling
+- **Components**: Modular component architecture with layout, common, and feature-specific components
+- **State Management**: React hooks for local state management
+- **UI Libraries**: Headless UI for accessible components
+
+### Directory Structure
+
+```
+frontend/
+├── app/                  # Next.js app directory with pages
+│   ├── dashboard/        # Dashboard page
+│   ├── tokens/           # Token management page
+│   ├── exchange/         # Exchange interface page
+│   └── layout.tsx        # Root layout component
+├── components/           # Reusable React components
+│   ├── common/           # Common UI components
+│   ├── dashboard/        # Dashboard-specific components
+│   └── layout/           # Layout components (header, footer)
+├── types/                # TypeScript type definitions
+└── public/               # Static assets
 ```
 
 ## Party Management

@@ -1,14 +1,7 @@
-# DAML specific
-/.daml
-/.lib
-/log
-navigator.log
-
-# Backend specific
 # compiled output
-/backend/dist
-/backend/node_modules
-/backend/build
+/dist
+/node_modules
+/build
 
 # Logs
 logs
@@ -23,8 +16,8 @@ lerna-debug.log*
 .DS_Store
 
 # Tests
-/backend/coverage
-/backend/.nyc_output
+/coverage
+/.nyc_output
 
 # IDEs and editors
 /.idea
