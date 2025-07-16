@@ -10,7 +10,7 @@ template TokenPair
   with
     admin: Party
     liquidityProvider: Party
-    inputTokenKey: (Party, Text)
+    baseTokenKey: (Party, Text)
     quoteTokenKey: (Party, Text)
     sellingPrice: Decimal
     buyingPrice: Decimal
@@ -20,17 +20,17 @@ template TokenPair
     signatory admin
     observer liquidityProvider, observers
 
-    key (admin, inputTokenKey, quoteTokenKey) : (Party, (Party, Text), (Party, Text))
+    key (admin, baseTokenKey, quoteTokenKey) : (Party, (Party, Text), (Party, Text))
     maintainer key._1
 
-    ensure inputTokenKey /= quoteTokenKey
+    ensure baseTokenKey /= quoteTokenKey
       && sellingPrice > 0.0
       && buyingPrice > 0.0
       -- && sellingPrice >= buyingPrice  -- Temporarily disabled
     
     interface instance ITokenPairKeys for TokenPair where
       view = TokenPairKeyView with
-        inputTokenKey = this.inputTokenKey
+        baseTokenKey = this.baseTokenKey
         quoteTokenKey = this.quoteTokenKey
 
     nonconsuming choice GetRate : (Decimal, Decimal)
@@ -38,26 +38,26 @@ template TokenPair
         requester: Party
       controller requester
       do
-        ensureListingsAreActive admin inputTokenKey quoteTokenKey
+        ensureListingsAreActive admin baseTokenKey quoteTokenKey
         ensurePartyIsRegistered registryKey requester requester
         return (sellingPrice, buyingPrice)
 
     nonconsuming choice GetLiquidityProvider : Party
       controller admin
       do
-        ensureListingsAreActive admin inputTokenKey quoteTokenKey
+        ensureListingsAreActive admin baseTokenKey quoteTokenKey
         ensurePartyIsRegistered registryKey admin admin
         return liquidityProvider
 
     nonconsuming choice GetData : TokenPairData
       controller admin
       do
-        ensureListingsAreActive admin inputTokenKey quoteTokenKey
+        ensureListingsAreActive admin baseTokenKey quoteTokenKey
         ensurePartyIsRegistered registryKey admin admin
         return TokenPairData with
           admin = admin
           liquidityProvider = liquidityProvider
-          inputTokenKey = inputTokenKey
+          baseTokenKey = baseTokenKey
           quoteTokenKey = quoteTokenKey
           sellingPrice = sellingPrice
           buyingPrice = buyingPrice
@@ -69,7 +69,7 @@ template TokenPair
         newBuyingPrice: Decimal
       controller admin
       do
-        ensureListingsAreActive admin inputTokenKey quoteTokenKey
+        ensureListingsAreActive admin baseTokenKey quoteTokenKey
         ensurePartyIsRegistered registryKey admin admin
         
         assertMsg "Selling price must be positive" (newSellingPrice > 0.0)
@@ -94,7 +94,7 @@ template TokenPair
       controller admin
       do
         ensurePartyIsRegistered registryKey admin admin
-        ensureListingsAreActive admin inputTokenKey quoteTokenKey
+        ensureListingsAreActive admin baseTokenKey quoteTokenKey
         
         archive self
 
@@ -140,7 +140,7 @@ template TokenPairSetup
         (_, registry) <- getPartyRegistryByKey registryKey
 
         create TokenPair with
-          inputTokenKey = inputListing.tokenMasterKey
+          baseTokenKey = inputListing.tokenMasterKey
           quoteTokenKey = quoteListing.tokenMasterKey
           observers = registry.registeredParties
           .. 

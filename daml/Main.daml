@@ -50,6 +50,39 @@ setup = do
     (btcMasterCid, btcTokenLedgerCid) <- submit btcOwner do
         exerciseCmd setupBTCid Initialize
 
+    -- USDC Owner deposit 200000 USDC to Alice
+    (usdcTokenTransferLockToAliceCid, usdcTokenLedger2Opt) <- submit usdcOwner do
+        exerciseCmd usdcTokenLedgerCid LockTokenForTransfer with
+            recipient = alice
+            transferAmount = 200000.00
+    let usdcTokenLedger2Cid = fromSome usdcTokenLedger2Opt
+
+    -- USDC Owner deposit 500000 USDC to LiquidityProvider
+    (usdcTokenTransferLockToLiquidityProviderCid, usdcTokenLedger3Opt) <- submit usdcOwner do
+        exerciseCmd usdcTokenLedger2Cid LockTokenForTransfer with
+            recipient = liquidityProvider
+            transferAmount = 500000.00
+    let usdcTokenLedger3Cid = fromSome usdcTokenLedger3Opt
+
+    -- BTC Owner deposit 1000 BTC to LiquidityProvider
+    (btcTokenTransferLockToLiquidityProviderCid, btcTokenLedger2Opt) <- submit btcOwner do
+        exerciseCmd btcTokenLedgerCid LockTokenForTransfer with
+            recipient = liquidityProvider
+            transferAmount = 1000.00
+    let btcTokenLedger2Cid = fromSome btcTokenLedger2Opt
+
+    -- Alice accept USDC deposit
+    submit alice do
+        exerciseCmd usdcTokenTransferLockToAliceCid Accept
+
+    -- LiquidityProvider accept USDC deposit
+    submit liquidityProvider do
+        exerciseCmd usdcTokenTransferLockToLiquidityProviderCid Accept
+
+    -- LiquidityProvider accept BTC deposit
+    submit liquidityProvider do
+        exerciseCmd btcTokenTransferLockToLiquidityProviderCid Accept
+
     -- create USDC TokenListing 
     usdcTokenListingRequestCid <- submit usdcOwner do
         createCmd ListingRequest with

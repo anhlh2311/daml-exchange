@@ -7,7 +7,7 @@ data TokenPairData = TokenPairData
   with
     admin: Party
     liquidityProvider: Party
-    inputTokenKey: (Party, Text)
+    baseTokenKey: (Party, Text)
     quoteTokenKey: (Party, Text)
     sellingPrice: Decimal
     buyingPrice: Decimal
@@ -16,7 +16,7 @@ data TokenPairData = TokenPairData
 
 data TokenPairKeyView = TokenPairKeyView
   with
-    inputTokenKey: (Party, Text)
+    baseTokenKey: (Party, Text)
     quoteTokenKey: (Party, Text)
   deriving (Eq, Show)
 

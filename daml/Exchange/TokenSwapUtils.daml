@@ -12,7 +12,7 @@ calculateBuyingAmount amount buyingPrice = amount * buyingPrice
 -- Calculate the expected output amount
 calculateExpectedOutputAmount: Text -> TokenPair -> Decimal -> Decimal
 calculateExpectedOutputAmount symbol tokenPair inputAmount = do
-  if symbol == (snd tokenPair.inputTokenKey)
+  if symbol == (snd tokenPair.baseTokenKey)
     then calculateBuyingAmount inputAmount tokenPair.buyingPrice
     else calculateSellingAmount inputAmount tokenPair.sellingPrice
 

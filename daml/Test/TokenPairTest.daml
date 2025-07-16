@@ -74,7 +74,7 @@ tokenPairTest = script do
 
   -- Validate token pair state after mint/burn operations
   tokenPairData <- submit admin do exerciseCmd tokenPairCid GetData
-  tokenPairData.inputTokenKey === btcMasterKey
+  tokenPairData.baseTokenKey === btcMasterKey
   tokenPairData.quoteTokenKey === usdtMasterKey
 
   -- Test choices
@@ -310,7 +310,7 @@ tokenListingUnlistTest = script do
   -- When the unlisting request is not approved, the token pair should still be active.
   debug "When the unlisting request is not approved, the token pair should still be active."
   tokenPairData <- submit admin do exerciseCmd tokenPairCid GetData
-  tokenPairData.inputTokenKey === btcMasterKey
+  tokenPairData.baseTokenKey === btcMasterKey
   tokenPairData.quoteTokenKey === usdtMasterKey
 
   -- The admin should still be able to set the rate on the token pair.
