@@ -1,6 +1,7 @@
 # DAML specific
 /.daml
 /.lib
+/daml.js
 /log
 navigator.log
 
