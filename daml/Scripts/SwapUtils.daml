@@ -12,6 +12,7 @@ createSwapWithTokenLocking: Party -> Party -> Party -> (Party, Party) -> (Party,
 createSwapWithTokenLocking swapper admin liquidityProvider inputTokenLedgerKey tokenPairKey inputAmount expectedOutputAmount slippageTolerance registryKey = do
   -- Validate token pair's existence
   tokenPairOpt <- queryContractKey @TokenPair swapper tokenPairKey
+  debug $ "tokenPairOpt: " <> show tokenPairOpt
   let tokenPairCid = (fromSome tokenPairOpt)._1
   let tokenPair = (fromSome tokenPairOpt)._2
 
@@ -37,3 +38,32 @@ createSwapWithTokenLocking swapper admin liquidityProvider inputTokenLedgerKey t
     createCmd SwapRequest with
       outputTokenLockCid = None
       ..
+
+-- Parameter record for script execution
+data SwapParams = SwapParams
+  with
+    swapper: Party
+    admin: Party
+    liquidityProvider: Party
+    inputTokenLedgerKey: (Party, Party)
+    tokenPairKey: (Party, (Party, Text), (Party, Text))
+    inputAmount: Decimal
+    expectedOutputAmount: Decimal
+    slippageTolerance: Decimal
+    registryKey: Party
+
+-- Wrapper script that can be called with daml script
+createSwapScript: SwapParams -> Script (ContractId SwapRequest)
+createSwapScript params = 
+  createSwapWithTokenLocking 
+    params.swapper 
+    params.admin 
+    params.liquidityProvider 
+    params.inputTokenLedgerKey 
+    params.tokenPairKey 
+    params.inputAmount 
+    params.expectedOutputAmount 
+    params.slippageTolerance 
+    params.registryKey
+
+

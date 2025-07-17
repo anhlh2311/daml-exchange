@@ -101,3 +101,45 @@ template SwapRequest
 
         -- create a reverse lock for the swapper to reclaim the input tokens
         exercise inputTokenLockCid Reject
+
+template SwapRequestSetup
+  with
+    swapper: Party
+    admin: Party
+    liquidityProvider: Party
+    inputTokenLedgerKey: (Party, Party)
+    tokenPairKey: (Party, (Party, Text), (Party, Text))
+    inputAmount: Decimal
+    expectedOutputAmount: Decimal
+    slippageTolerance: Decimal
+    registryKey: Party
+  where
+    signatory swapper
+    observer admin, liquidityProvider
+    
+    ensure inputAmount > 0.0 && expectedOutputAmount > 0.0 && rangeValidation 0.0 1.0 slippageTolerance
+
+    choice CreateSwapRequest : ContractId SwapRequest
+      controller swapper
+      do
+        ensurePartyIsRegistered registryKey swapper swapper
+
+        -- Fetch the input token ledger
+        (inputTokenLedgerCid, inputTokenLedger) <- fetchByKey @TokenLedger inputTokenLedgerKey
+
+        -- Check if the input token ledger has enough balance
+        assertMsg "Insufficient balance" (inputTokenLedger.amount >= inputAmount)
+
+        -- Create the Token Transfer lock for the input tokens
+        (inputTokenLockCid, _) <- exercise inputTokenLedgerCid LockTokenForTransfer
+          {
+            recipient = liquidityProvider,
+            transferAmount = inputAmount
+          }
+
+        -- Create the swap request
+        create SwapRequest with
+          inputTokenLockCid = inputTokenLockCid
+          outputTokenLockCid = None
+          ..
+        

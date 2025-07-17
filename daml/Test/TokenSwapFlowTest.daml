@@ -323,3 +323,106 @@ testSwapFailureWithFinalizeSwapBeforeAcceptSwap = do
     exerciseCmd usdtToBtcSwapRequestCid FinalizeSwap
   
   return ()
+
+  -- Test script with hardcoded parameters for easy execution
+testSwapScript = do
+  (activeBTCUSDTTokenPairCid, 
+    btcUsdtTokenPairKey, 
+    [admin, alice, bob, lp, btcOwner, usdtOwner]) <- initializeLedger 100.0 1000000000.0 109512.0 109483.0
+  
+  let 
+    swapper = alice
+    liquidityProvider = lp
+    inputTokenLedgerKey = (usdtOwner, swapper)
+    tokenPairKey = (admin, (btcOwner, "BTC"), (usdtOwner, "USDT"))
+    -- inputAmount = 1086.08
+    -- expectedOutputAmount = 0.01
+    -- slippageTolerance = 0.05
+    -- registryKey = admin
+
+  let params = SwapParams with
+        swapper = swapper
+        admin = admin
+        liquidityProvider = liquidityProvider
+        inputTokenLedgerKey = (usdtOwner, swapper)
+        tokenPairKey = tokenPairKey
+        inputAmount = 1095.12
+        expectedOutputAmount = 0.01
+        slippageTolerance = 0.05
+        registryKey = admin
+  
+  swapRequestCid <- createSwapScript params
+
+  debug $ "Swap request CID: " <> show swapRequestCid
+  
+  return ()
+
+testSwapRequestSetup = do
+  (activeBTCUSDTTokenPairCid, 
+    btcUsdtTokenPairKey, 
+    [admin, alice, bob, lp, btcOwner, usdtOwner]) <- initializeLedger 100.0 1000000000.0 109512.0 109483.0
+
+  let 
+    swapper = alice
+    liquidityProvider = lp
+    inputTokenLedgerKey = (usdtOwner, swapper)
+    tokenPairKey = (admin, (btcOwner, "BTC"), (usdtOwner, "USDT"))
+
+  swapRequestSetupCid <- submit alice do
+    createCmd SwapRequestSetup with
+      swapper
+      admin
+      liquidityProvider
+      inputTokenLedgerKey
+      tokenPairKey
+      inputAmount = 1095.12
+      expectedOutputAmount = 0.01
+      slippageTolerance = 0.05
+      registryKey = admin
+
+  debug $ "Swap request setup CID: " <> show swapRequestSetupCid
+
+  -- Query the swap request setup payload
+  swapRequestSetup <- queryContractId alice swapRequestSetupCid
+  debug $ "Swap request setup: " <> show swapRequestSetup
+
+  -- Alice create the swap request from the swap request setup
+  swapRequestCid <- submit alice do
+    exerciseCmd swapRequestSetupCid CreateSwapRequest
+
+  debug $ "Swap request CID: " <> show swapRequestCid
+
+  -- Query the swap request payload
+  swapRequest <- queryContractId alice swapRequestCid
+  debug $ "Swap request: " <> show swapRequest
+
+  -- Liquidity Provider accept the swap request
+  (lpUsdtTokenLedgerCid, acceptedSwapRequestCid) <- submit lp do
+    exerciseCmd swapRequestCid AcceptSwap with
+      outputTokenLedgerKey = (btcOwner, lp)
+  
+  debug $ "LP USDT token ledger CID: " <> show lpUsdtTokenLedgerCid
+
+  -- Query LP's USDT token ledger
+  lpUsdtTokenLedgerOpt <- queryContractId lp lpUsdtTokenLedgerCid
+  let lpUsdtTokenLedger = (fromSome lpUsdtTokenLedgerOpt)
+  debug $ "Liquidity Provider token balance of " <> lpUsdtTokenLedger.symbol <> " is: " <> show lpUsdtTokenLedger.amount
+
+  debug $ "Accepted swap request CID: " <> show acceptedSwapRequestCid
+  -- Query the accepted swap request
+  acceptedSwapRequest <- queryContractId lp acceptedSwapRequestCid
+  debug $ "Accepted swap request: " <> show acceptedSwapRequest
+
+  -- Alice finalize the swap
+  aliceBtcTokenLedgerCid <- submit alice do
+    exerciseCmd acceptedSwapRequestCid FinalizeSwap
+
+  -- Query Alice's BTC token ledger
+  aliceBtcTokenLedgerOpt <- queryContractKey @TokenLedger alice (btcOwner, alice)
+  let aliceBtcTokenLedger = (fromSome aliceBtcTokenLedgerOpt)._2
+  debug $ "Alice token balance of " <> aliceBtcTokenLedger.symbol <> " is: " <> show aliceBtcTokenLedger.amount
+
+  -- Query Alice's USDT token ledger
+  aliceUsdtTokenLedgerOpt <- queryContractKey @TokenLedger alice (usdtOwner, alice)
+  let aliceUsdtTokenLedger = (fromSome aliceUsdtTokenLedgerOpt)._2
+  return ()
