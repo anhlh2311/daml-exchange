@@ -1,6 +1,5 @@
 .swap-wrapper {
-  width: 500px;
-  max-width: 500px;
+  width: 60vw;
   margin: 40px auto;
   padding: 24px;
   border-radius: 12px;
@@ -17,11 +16,16 @@
   margin-bottom: 24px;
 }
 
-.swap-form label {
-  display: block;
-  margin-bottom: 16px;
-  font-size: 14px;
-  color: #334155;
+.swap-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.swap-form p {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #6366f1;
 }
 
 .swap-form select,
@@ -37,7 +41,7 @@
 .swap-button2 {
   margin-top: 20px;
   width: 100%;
-  background-color: #2563eb;
+  background-color: #6366f1;
   color: white;
   font-weight: 500;
   border: none;
@@ -49,5 +53,5 @@
 }
 
 .swap-button:hover {
-  background-color: #1d4ed8;
+  background-color: #494be7;
 }

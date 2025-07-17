@@ -4,6 +4,7 @@ import TokenCard from "components/token-card/token-card";
 import { TokenLedger } from "@daml.js/exchange-0.0.1/lib/Currency/TokenLedger";
 import { useLedgerParty } from "context/ledger-context";
 import "./token-card.css";
+import LoadingScreen from "components/loading/loading";
 
 const TokenCardPage = () => {
   const { selectedParty } = useLedgerParty();
@@ -14,6 +15,10 @@ const TokenCardPage = () => {
     () => ({ holder: selectedParty?.identifier }),
     [party]
   );
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
 
   return (
     <MainLayout>

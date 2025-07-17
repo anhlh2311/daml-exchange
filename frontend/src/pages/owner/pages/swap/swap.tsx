@@ -1,8 +1,11 @@
+import MainLayout from "components/layout/main-layout";
+import LoadingScreen from "components/loading/loading";
+import { useTokenPair } from "hooks/useGetTokenPair";
+import { SlippageTolerance } from "pages/owner/component/slippage-tolerance/slippage-tolerance";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "./swap.css";
-import MainLayout from "components/layout/main-layout";
-import { ArrowLeftIcon } from "@heroicons/react/20/solid";
+import { ArrowsUpDownIcon } from "@heroicons/react/20/solid";
 
 const allTokens = [
   { symbol: "USDC", name: "USD Coin" },
@@ -12,6 +15,8 @@ const allTokens = [
 const Swap = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { loading, rate, rateLoading, tokenPairs } = useTokenPair();
+  console.log({ tokenPairs });
 
   const defaultToken = location.state?.defaultToken;
 
@@ -32,57 +37,63 @@ const Swap = () => {
     }
     alert(`Swapping ${amount} ${fromToken} → ${toToken}`);
   };
-
+  if (loading) {
+    return <LoadingScreen />;
+  }
   return (
     <MainLayout>
       <div className="swap-wrapper">
         <h2 className="swap-title">Swap Tokens</h2>
         <div className="swap-form">
-          <label>
-            From Token:
-            <select
-              value={fromToken}
-              onChange={(e) => setFromToken(e.target.value)}
-            >
-              <option value="">-- Select Token --</option>
-              {allTokens.map((token) => (
+          <p>You Pay</p>
+          <select
+            value={fromToken}
+            onChange={(e) => setFromToken(e.target.value)}
+          >
+            <option value="">-- Select Token --</option>
+            {allTokens.map((token) => (
+              <option key={token.symbol} value={token.symbol}>
+                {token.name} ({token.symbol})
+              </option>
+            ))}
+          </select>
+
+          <input
+            type="number"
+            min="0"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="Enter amount"
+          />
+          <div
+            className="token-card-symbol"
+            style={{ padding: "15px", margin: "auto" }}
+          >
+            <ArrowsUpDownIcon color="#6366f1" />
+          </div>
+          <p>You Receive</p>
+          <select value={toToken} onChange={(e) => setToToken(e.target.value)}>
+            <option value="">-- Select Token --</option>
+            {allTokens
+              .filter((t) => t.symbol !== fromToken)
+              .map((token) => (
                 <option key={token.symbol} value={token.symbol}>
                   {token.name} ({token.symbol})
                 </option>
               ))}
-            </select>
-          </label>
+          </select>
 
-          <label>
-            To Token:
-            <select
-              value={toToken}
-              onChange={(e) => setToToken(e.target.value)}
-            >
-              <option value="">-- Select Token --</option>
-              {allTokens
-                .filter((t) => t.symbol !== fromToken)
-                .map((token) => (
-                  <option key={token.symbol} value={token.symbol}>
-                    {token.name} ({token.symbol})
-                  </option>
-                ))}
-            </select>
-          </label>
-
-          <label>
-            Amount:
-            <input
-              type="number"
-              min="0"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="Enter amount"
-            />
-          </label>
+          <input
+            type="number"
+            min="0"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="Enter amount"
+          />
+          <SlippageTolerance />
 
           <button className="swap-button2" onClick={handleSwap}>
-            🔁 Swap
+            Swap
           </button>
         </div>
       </div>
