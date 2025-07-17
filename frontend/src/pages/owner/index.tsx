@@ -6,10 +6,13 @@ import { metrics, metricsProvider } from "utils/dataMock";
 import QuickAction from "./component/quick-action/quick-action";
 import "./index.css";
 import SwapRequest from "./component/swap-request/swap-request";
+import { useSwapRequestAction } from "hooks/useSwapRequestAction";
 
 const Owner = () => {
   const { role } = useAuthStore();
   const isProvider = role === "liquidity";
+  const { contracts } = useSwapRequestAction();
+  console.log({ contracts });
 
   return (
     <MainLayout>

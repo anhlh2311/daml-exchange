@@ -13,9 +13,14 @@ import { useLedgerParty } from "../../context/ledger-context";
 import "./party-selector.css";
 
 const PartySelector = () => {
-  const { setSelectedParty, token, selectedParty, setRole } = useLedgerParty();
-  const [listParties, setListParties] = useState<Party[]>([]);
-  // const navigate = useNavigate();
+  const {
+    setSelectedParty,
+    token,
+    selectedParty,
+    setRole,
+    listParties,
+    setListParties,
+  } = useLedgerParty();
 
   useEffect(() => {
     const fetchParties = async () => {
@@ -42,14 +47,7 @@ const PartySelector = () => {
   const handleSelectParty = (selected: Party) => {
     setSelectedParty(selected);
     const role = getRoleFromDisplayName(selected.displayName);
-
     setRole(role);
-
-    // if (role === "admin") {
-    //   navigate("/admin");
-    // } else {
-    //   navigate("/");
-    // }
   };
 
   return (

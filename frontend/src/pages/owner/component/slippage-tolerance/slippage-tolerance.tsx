@@ -1,15 +1,20 @@
 import React, { useState } from "react";
 import "./slippage-tolerance.css";
 
-export const SlippageTolerance = () => {
-  const [slippage, setSlippage] = useState(1.2);
+interface IProps {
+  receiveAmount: string;
+  slippage: number;
+  setSlippage: React.Dispatch<React.SetStateAction<number>>;
+}
+export const SlippageTolerance = (props: IProps) => {
+  const { receiveAmount, setSlippage, slippage } = props;
 
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSlippage(parseFloat(e.target.value));
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value.replace(",", "."); // Hỗ trợ dấu phẩy
+    let val = e.target.value.replace(",", ".");
     const parsed = parseFloat(val);
     if (!isNaN(parsed)) {
       const clamped = Math.min(5, Math.max(0.1, parsed));
@@ -44,9 +49,15 @@ export const SlippageTolerance = () => {
       </div>
 
       <div className="price-impact-container">
-        <p className="exchange-rate">
-          <strong>1 BTC = 40.000000 ETH (Minimum: 39.520000)</strong>
-        </p>
+        {Number(receiveAmount) ? (
+          <p className="exchange-rate">
+            <strong>
+              1 BTC = 108589 USDC (Minimum:
+              {parseFloat(receiveAmount) * (1 - slippage / 100)})
+            </strong>
+          </p>
+        ) : null}
+
         <p className="price-impact-note">
           Maximum price impact based on current settings
         </p>

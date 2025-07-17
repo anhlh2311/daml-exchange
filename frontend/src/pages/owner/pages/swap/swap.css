@@ -55,3 +55,16 @@
 .swap-button:hover {
   background-color: #494be7;
 }
+.balance-box {
+  background-color: #eaf7ed;
+  padding: 16px 24px;
+  border-radius: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.balance-text {
+  color: #064e3b;
+  font-size: 18px;
+  font-weight: 500;
+}

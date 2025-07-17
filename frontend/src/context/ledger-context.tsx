@@ -10,6 +10,8 @@ interface LedgerContextType {
   token: string;
   role: Role;
   setRole: (role: Role) => void;
+  listParties: Party[];
+  setListParties: (party: Party[] | []) => void;
 }
 
 interface Props {
@@ -29,13 +31,22 @@ export const useLedgerParty = (): LedgerContextType => {
 export const LedgerProvider: React.FC<Props> = ({ children }) => {
   const [selectedParty, setSelectedParty] = useState<Party | null>(null);
   const [role, setRole] = useState<Role>(null);
+  const [listParties, setListParties] = useState<Party[]>([]);
 
   const token = (authConfig as Insecure).makeToken(
     selectedParty?.displayName ?? "Admin"
   );
   return (
     <LedgerContext.Provider
-      value={{ selectedParty, setSelectedParty, token, role, setRole }}
+      value={{
+        selectedParty,
+        setSelectedParty,
+        token,
+        role,
+        setRole,
+        listParties,
+        setListParties,
+      }}
     >
       {selectedParty ? (
         <DamlLedger

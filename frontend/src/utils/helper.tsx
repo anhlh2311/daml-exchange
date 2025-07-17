@@ -2,6 +2,7 @@ import jwtEncode from "jwt-encode";
 import { isRunningOnHub } from "@daml/hub-react";
 import Ledger, { CanReadAs } from "@daml/ledger";
 import { Role } from "stores/authStore";
+import { ListTokenProps } from "hooks/useGetTokenPair";
 export const createToken = (party: string): string => {
   const payload = {
     "https://daml.com/ledger-api": {
@@ -97,3 +98,13 @@ export function getRoleFromDisplayName(displayName: string): Role {
 export function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(" ");
 }
+export const getBalanceToken = (
+  tokens: ListTokenProps[],
+  token: string | number | undefined
+) => {
+  const balanceToken = tokens.find((item) => item.symbol === token)?.balance;
+  if (!balanceToken) {
+    return "0";
+  }
+  return balanceToken;
+};
