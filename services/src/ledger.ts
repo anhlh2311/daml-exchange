@@ -16,10 +16,10 @@ export class LedgerService {
   async connect(): Promise<LedgerConnection> {
     try {
       const ledgerUrl = config.ledger.useTls 
-        ? `https://${config.ledger.host}:${config.ledger.port}/`
-        : `http://${config.ledger.host}:${config.ledger.port}/`;
+        ? `https://${config.ledger.host}:${config.ledger.httpJsonPort}/`
+        : `http://${config.ledger.host}:${config.ledger.httpJsonPort}/`;
 
-      logger.info('Connecting to Daml ledger', { 
+      logger.info('Connecting to Daml HTTP JSON API', { 
         url: ledgerUrl, 
         party: config.parties.liquidityProvider 
       });

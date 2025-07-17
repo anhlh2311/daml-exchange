@@ -24,7 +24,8 @@ class Application {
       logger.info('Application started successfully', {
         party: config.parties.liquidityProvider,
         ledgerHost: config.ledger.host,
-        ledgerPort: config.ledger.port,
+        ledgerGrpcPort: config.ledger.port,
+        httpJsonPort: config.ledger.httpJsonPort,
         autoAccept: config.autoAccept.enabled
       });
 

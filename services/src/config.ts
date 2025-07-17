@@ -6,7 +6,8 @@ dotenv.config();
 export interface ServiceConfig {
   ledger: {
     host: string;
-    port: number;
+    port: number; // gRPC ledger port for Daml scripts
+    httpJsonPort: number; // HTTP JSON API port
     useTls: boolean;
   };
   parties: {
@@ -30,7 +31,8 @@ export interface ServiceConfig {
 export const config: ServiceConfig = {
   ledger: {
     host: process.env.LEDGER_HOST || 'localhost',
-    port: parseInt(process.env.LEDGER_PORT || '7575', 10),
+    port: parseInt(process.env.LEDGER_PORT || '6865', 10), // Default to gRPC ledger port
+    httpJsonPort: parseInt(process.env.HTTP_JSON_PORT || '7575', 10), // Default to HTTP JSON API port
     useTls: process.env.LEDGER_USE_TLS === 'true',
   },
   parties: {
@@ -64,6 +66,10 @@ export function validateConfig(): void {
 
   if (config.ledger.port <= 0 || config.ledger.port > 65535) {
     errors.push('LEDGER_PORT must be a valid port number');
+  }
+
+  if (config.ledger.httpJsonPort <= 0 || config.ledger.httpJsonPort > 65535) {
+    errors.push('HTTP_JSON_PORT must be a valid port number');
   }
 
   if (config.service.pollingIntervalMs <= 0) {

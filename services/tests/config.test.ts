@@ -20,6 +20,7 @@ describe('Configuration', () => {
       expect(typeof config.parties.liquidityProvider).toBe('string');
       expect(typeof config.ledger.host).toBe('string');
       expect(typeof config.ledger.port).toBe('number');
+      expect(typeof config.ledger.httpJsonPort).toBe('number');
       expect(typeof config.ledger.useTls).toBe('boolean');
       expect(typeof config.autoAccept.enabled).toBe('boolean');
       expect(typeof config.service.pollingIntervalMs).toBe('number');
@@ -29,7 +30,8 @@ describe('Configuration', () => {
     it('should have sensible default values', () => {
       expect(config.parties.liquidityProvider).toBe('TestLiquidityProvider'); // From test setup
       expect(config.ledger.host).toBe('localhost');
-      expect(config.ledger.port).toBe(7575);
+      expect(config.ledger.port).toBe(6865); // gRPC port
+      expect(config.ledger.httpJsonPort).toBe(7575); // HTTP JSON API port
       expect(config.ledger.useTls).toBe(false);
       expect(config.service.pollingIntervalMs).toBeGreaterThan(0);
       expect(['error', 'warn', 'info', 'debug'].includes(config.service.logLevel)).toBe(true);

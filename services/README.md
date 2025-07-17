@@ -14,6 +14,7 @@ A Node.js backend service that connects to the Daml ledger and acts as a liquidi
 - **Manual Control**: Provides APIs for manual swap acceptance/rejection
 - **Comprehensive Logging**: Structured logging with configurable levels
 - **Graceful Shutdown**: Handles shutdown signals properly
+- **Swap Request Creation Scripts**: Easy-to-use scripts for creating swap requests (see [scripts/README.md](scripts/README.md))
 
 ## Prerequisites
 
@@ -55,7 +56,8 @@ cp env.example .env
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `LEDGER_HOST` | Daml ledger hostname | `localhost` |
-| `LEDGER_PORT` | Daml HTTP JSON API port | `7575` |
+| `LEDGER_PORT` | Daml ledger gRPC port (for scripts) | `6865` |
+| `HTTP_JSON_PORT` | HTTP JSON API port (for service) | `7575` |
 | `LEDGER_USE_TLS` | Use TLS connection | `false` |
 | `LIQUIDITY_PROVIDER_PARTY` | Party name for the liquidity provider | `LiquidityProvider` |
 | `ADMIN_PARTY` | Admin party name | `Admin` |
@@ -92,6 +94,46 @@ For development with file watching:
 ```bash
 npm run start:watch
 ```
+
+## Swap Request Creation Scripts
+
+This package includes convenient scripts for creating swap requests that can be processed by the liquidity provider service. These scripts simplify the process of calling the Daml `createSwapWithTokenLocking` function.
+
+### Quick Examples
+
+```bash
+# List available pre-configured examples
+npm run swap:list
+
+# Execute swap requests directly on the ledger
+npm run swap:usdt-btc
+npm run swap:btc-usdt
+
+# Generate commands for manual execution
+npm run swap:generate-usdt-btc
+npm run swap:generate-btc-usdt
+
+# Create a custom swap request (executes directly)
+npm run create-swap -- \
+  --swapper Alice \
+  --admin Admin \
+  --liquidity-provider LiquidityProvider \
+  --input-token-owner UsdtOwner \
+  --input-token-symbol USDT \
+  --output-token-owner BtcOwner \
+  --output-token-symbol BTC \
+  --input-amount 1095.12 \
+  --expected-output 0.01 \
+  --slippage 0.05
+
+# Generate a custom command only
+npm run create-swap:generate -- \
+  --swapper Alice \
+  --admin Admin \
+  [... other parameters]
+```
+
+For complete documentation of the scripts, see [scripts/README.md](scripts/README.md).
 
 ## How It Works
 

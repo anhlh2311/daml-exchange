@@ -1,7 +1,6 @@
 import { LiquidityProviderService } from "../src/liquidityProvider";
 import { LedgerService } from "../src/ledger";
 import { config } from "../src/config";
-import { SwapRequest } from "@daml.js/exchange-0.0.1/lib/Exchange/TokenSwap";
 
 // Mock the entire @daml/ledger module
 const mockLedgerClient = {

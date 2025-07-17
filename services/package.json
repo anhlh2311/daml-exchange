@@ -10,7 +10,17 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "create-swap": "ts-node scripts/createSwapRequest.ts",
+    "create-swap:generate": "ts-node scripts/createSwapRequest.ts --generate-only",
+    "swap-examples": "ts-node scripts/swap-examples.ts",
+    "swap:list": "npm run swap-examples list",
+    "swap:usdc-btc": "npm run swap-examples run usdcToBtc",
+    "swap:btc-usdc": "npm run swap-examples run btcToUsdc",
+    "swap:run-all": "npm run swap-examples run-all",
+    "swap:generate-usdc-btc": "npm run swap-examples -- --generate-only run usdcToBtc",
+    "swap:generate-btc-usdc": "npm run swap-examples -- --generate-only run btcToUsdc",
+    "swap:generate-all": "npm run swap-examples -- --generate-only run-all"
   },
   "dependencies": {
     "@daml.js/exchange-0.0.1": "file:../daml.js/exchange-0.0.1",

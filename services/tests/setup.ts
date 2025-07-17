@@ -4,7 +4,8 @@
 process.env.NODE_ENV = 'test';
 process.env.LIQUIDITY_PROVIDER_PARTY = 'TestLiquidityProvider';
 process.env.LEDGER_HOST = 'localhost';
-process.env.LEDGER_PORT = '7575';
+process.env.LEDGER_PORT = '6865'; // gRPC port for Daml scripts
+process.env.HTTP_JSON_PORT = '7575'; // HTTP JSON API port
 process.env.LEDGER_USE_TLS = 'false';
 process.env.AUTO_ACCEPT_SWAPS = 'true';
 process.env.LOG_LEVEL = 'error'; // Reduce log noise during tests
