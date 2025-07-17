@@ -1,18 +1,36 @@
-// router.tsx
-import AppLayout from "App";
-import LedgerAssets from "pages/ledger-assets";
-import Swap from "pages/swap";
-import TokenDetail from "pages/token-detail";
+import App from "App";
+import { ProtectedRoute } from "components/routers/protected-route";
+import AdminPage from "pages/admin";
+import Owner from "pages/owner";
+import Swap from "pages/owner/pages/swap/swap";
+import TokenCardPage from "pages/owner/pages/token-card/token-card";
+import { TokenDetailPage } from "pages/owner/pages/token-detail/token-detail";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <AppLayout />,
+    element: <App />,
     children: [
-      { index: true, element: <LedgerAssets /> },
-      { path: "swap", element: <Swap /> },
-      { path: "token/:contractId", element: <TokenDetail /> },
+      {
+        element: <ProtectedRoute allowedRoles={["admin"]} />,
+        children: [{ path: "admin", element: <AdminPage /> }],
+      },
+      {
+        element: (
+          <ProtectedRoute allowedRoles={["owner", "holder", "liquidity"]} />
+        ),
+        children: [
+          { index: true, element: <Owner /> },
+          { path: "swap", element: <Swap /> },
+          { path: "token", element: <TokenCardPage /> },
+          { path: "token-detail", element: <TokenDetailPage /> },
+        ],
+      },
+      {
+        path: "unauthorized",
+        element: <div>Unauthorized</div>,
+      },
     ],
   },
 ]);

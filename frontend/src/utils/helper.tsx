@@ -1,6 +1,7 @@
 import jwtEncode from "jwt-encode";
 import { isRunningOnHub } from "@daml/hub-react";
 import Ledger, { CanReadAs } from "@daml/ledger";
+import { Role } from "stores/authStore";
 export const createToken = (party: string): string => {
   const payload = {
     "https://daml.com/ledger-api": {
@@ -84,3 +85,15 @@ export const insecure: Insecure = (() => {
 
 export const authConfig: Authentication = (() =>
   isRunningOnHub() ? damlHub : insecure)();
+
+export function getRoleFromDisplayName(displayName: string): Role {
+  if (displayName === "Admin") return "admin";
+  if (displayName === "BTCOwner" || displayName === "USDCOwner")
+    return "holder";
+  if (displayName === "LiquidityProvider") return "liquidity";
+  return "owner";
+}
+
+export function classNames(...classes: string[]) {
+  return classes.filter(Boolean).join(" ");
+}

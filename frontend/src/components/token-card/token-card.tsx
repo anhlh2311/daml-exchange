@@ -2,71 +2,80 @@ import { TokenCardProps } from "utils/model";
 import "./token-card.css";
 import { useNavigate } from "react-router-dom";
 
-interface IProps {
-  token: TokenCardProps;
-}
-const TokenCard = (props: IProps) => {
-  const { payload, contractId } = props.token;
-  const { owner, amount, holder, symbol, metadata } = payload;
+type TokenCardProp = {
+  data?: TokenCardProps;
+  isEmpty?: boolean;
+};
+
+function TokenCard({ data, isEmpty }: TokenCardProp) {
   const navigate = useNavigate();
 
-  const handleClick = () => {
-    navigate(`/token/${contractId}`, { state: props.token });
+  if (isEmpty) {
+    return (
+      <div className="token-card empty-card">
+        <div className="token-header">
+          <div className="token-card-symbol empty-symbol">—</div>
+          <div className="token-info">
+            <h4>No Token</h4>
+            <p>No token available</p>
+          </div>
+        </div>
+        <div className="token-amount">
+          <p className="amount">0</p>
+          <p className="formatted-amount">—</p>
+        </div>
+        <div className="token-actions">
+          <button disabled className="transfer-btn disabled-btn">
+            Transfer
+          </button>
+          <button disabled className="details-btn disabled-btn">
+            Details
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  const { payload } = data;
+  const { metadata, amount, symbol } = payload;
+  const { name, description } = metadata;
+  const formattedAmount = `${symbol} ${amount}`;
+
+  const handleShowTransfer = () => {
+    navigate("/swap");
+  };
+
+  const handleShowDetails = () => {
+    navigate(`/token-detail`, { state: data });
   };
 
   return (
-    <div className="token-card" onClick={handleClick}>
+    <div className="token-card">
       <div className="token-header">
-        <img
-          src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4b0.png"
-          alt="token-icon"
-          className="token-icon"
-        />
-        <h2>
-          {metadata.name} ({symbol})
-        </h2>
+        <div className="token-card-symbol">
+          <span>{symbol}</span>
+        </div>
+        <div className="token-info">
+          <h4>{name}</h4>
+          <p>{description}</p>
+        </div>
       </div>
-
-      <div className="token-details">
-        <p>
-          <strong>Contract ID:</strong>{" "}
-          <span className="truncate-text" title={contractId}>
-            {contractId}
-          </span>
-        </p>
-
-        <p>
-          <strong>Owner:</strong> <span className="truncate-text">{owner}</span>
-        </p>
-        <p>
-          <strong>Holder:</strong>{" "}
-          <span className="truncate-text">{holder}</span>
-        </p>
-        <p>
-          <strong>Amount:</strong> {amount}
-        </p>
-        <p>
-          <strong>Decimals:</strong> {metadata.decimals}
-        </p>
-        <p>
-          <strong>Issued Date:</strong>{" "}
-          {new Date(metadata.issuedDate).toLocaleDateString()}
-        </p>
-        <p>
-          <strong>Description:</strong>{" "}
-          <span className="truncate-text" title={metadata.description}>
-            {metadata.description}
-          </span>
-        </p>
-
-        {metadata.version && (
-          <p>
-            <strong>Version:</strong> {metadata.version}
-          </p>
-        )}
+      <div className="token-amount">
+        <p className="amount">{amount}</p>
+        <p className="formatted-amount">{formattedAmount}</p>
+      </div>
+      <div className="token-actions">
+        <button onClick={handleShowTransfer} className="transfer-btn">
+          Transfer
+        </button>
+        <button onClick={handleShowDetails} className="details-btn">
+          Details
+        </button>
       </div>
     </div>
   );
-};
+}
 
 export default TokenCard;

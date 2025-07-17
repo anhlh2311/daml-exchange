@@ -1,6 +1,10 @@
+import { Role } from "stores/authStore";
+
 export type Party = {
-  displayName: string;
   identifier: string;
+  displayName: string;
+  role?: Role;
+  isLocal?: boolean;
 };
 export interface Metadata {
   name: string;
@@ -26,4 +30,8 @@ export interface TokenCardProps {
   templateId: string;
   signatories: string[];
   observers: string[];
+}
+export interface System {
+  value: number | string;
+  label: string;
 }

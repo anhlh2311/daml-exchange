@@ -1,6 +1,6 @@
-// src/context/LedgerContext.tsx
 import DamlLedger from "@daml/react";
 import React, { createContext, useContext, useState, ReactNode } from "react";
+import { Role } from "stores/authStore";
 import { authConfig, Insecure } from "utils/helper";
 import { Party } from "utils/model";
 
@@ -8,6 +8,12 @@ interface LedgerContextType {
   selectedParty: Party | null;
   setSelectedParty: (party: Party | null) => void;
   token: string;
+  role: Role;
+  setRole: (role: Role) => void;
+}
+
+interface Props {
+  children: ReactNode;
 }
 
 const LedgerContext = createContext<LedgerContextType | undefined>(undefined);
@@ -20,17 +26,17 @@ export const useLedgerParty = (): LedgerContextType => {
   return ctx;
 };
 
-interface Props {
-  children: ReactNode;
-}
-
 export const LedgerProvider: React.FC<Props> = ({ children }) => {
   const [selectedParty, setSelectedParty] = useState<Party | null>(null);
+  const [role, setRole] = useState<Role>(null);
+
   const token = (authConfig as Insecure).makeToken(
     selectedParty?.displayName ?? "Admin"
   );
   return (
-    <LedgerContext.Provider value={{ selectedParty, setSelectedParty, token }}>
+    <LedgerContext.Provider
+      value={{ selectedParty, setSelectedParty, token, role, setRole }}
+    >
       {selectedParty ? (
         <DamlLedger
           party={selectedParty.displayName}

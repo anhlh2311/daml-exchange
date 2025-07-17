@@ -1,0 +1,22 @@
+.action-buttons-pending {
+  display: flex;
+  gap: 8px;
+}
+
+.accept-btn-pending {
+  background-color: #22c55e;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+}
+
+.reject-btn-pending {
+  background-color: #ef4444;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+}

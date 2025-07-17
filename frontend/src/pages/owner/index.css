@@ -1,0 +1,174 @@
+.dashboard-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.overview-container-owner {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .overview-container-owner {
+    flex-direction: row;
+  }
+}
+
+.overview-left {
+  width: 100%;
+}
+
+.overview-left.provider-full {
+  width: 100%;
+}
+
+.overview-right {
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .overview-left:not(.provider-full) {
+    width: 33.3333%;
+  }
+  .overview-right:not(.hidden) {
+    width: 66.6666%;
+    display: inline-block;
+  }
+}
+
+.overview-right.hidden {
+  display: none;
+}
+
+.activity-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+@media (min-width: 1024px) {
+  .activity-grid {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+.token-holdings {
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.token-holdings-header {
+  padding: 20px 16px;
+}
+
+.token-holdings-header h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.token-holdings-header p {
+  margin-top: 4px;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.token-holdings-content {
+  border-top: 1px solid #e5e7eb;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.token-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.token-info {
+  display: flex;
+  align-items: center;
+}
+
+.token-icon-owner {
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+.token-icon.usd {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.token-icon.eur {
+  background: #fef9c3;
+  color: #ca8a04;
+}
+
+.token-icon.gbp {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.token-text {
+  margin-left: 16px;
+}
+
+.token-text h4 {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #111827;
+}
+
+.token-text p {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.token-amount {
+  text-align: right;
+}
+
+.token-amount p {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #111827;
+}
+
+.token-amount span {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.view-all {
+  margin-top: 24px;
+}
+
+.view-all a {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 8px 12px;
+  background: #4f46e5;
+  color: #fff;
+  border-radius: 6px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+
+.view-all a:hover {
+  background: #4338ca;
+}

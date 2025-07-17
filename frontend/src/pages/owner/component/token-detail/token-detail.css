@@ -1,0 +1,160 @@
+.token-detail-wrapper {
+  min-height: 80vh;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+@media (min-width: 768px) {
+  .token-detail-wrapper {
+    padding: 32px;
+  }
+}
+
+.back-button {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  color: #4f46e5;
+  margin-bottom: 24px;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.back-button:hover {
+  text-decoration: underline;
+}
+
+.back-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+}
+
+.token-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.token-header {
+  display: flex;
+  align-items: center;
+}
+
+.token-symbol {
+  width: 68px;
+  height: 68px;
+  border-radius: 100%;
+  background: #eef2ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #4f46e5;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.token-info {
+  margin-left: 16px;
+}
+
+.token-name {
+  font-size: 24px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.token-description {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.token-amount {
+  text-align: left;
+}
+
+.token-amount-main {
+  font-size: 32px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.token-amount-sub {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.token-details {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.detail-label {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.detail-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.token-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .token-actions {
+    flex-direction: row;
+  }
+}
+
+.primary-button {
+  background: #4f46e5;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.primary-button:hover {
+  background: #4338ca;
+}
+
+.secondary-button {
+  background: #fff;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.secondary-button:hover {
+  background: #f9fafb;
+}

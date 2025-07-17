@@ -1,53 +1,96 @@
 .token-card {
-  background: #1e293b;
-  width: 100%;
-  height: 100%;
-  color: #e2e8f0;
-  border-radius: 16px;
-  padding: 24px;
-  max-width: 500px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
-  cursor: pointer;
-  /* transition: transform 0.2s ease; */
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  padding: 12px;
 }
-
-/* .token-card:hover {
-  transform: translateY(-4px);
-} */
 
 .token-header {
   display: flex;
   align-items: center;
-  margin-bottom: 3rem;
 }
 
-.token-icon {
-  width: 48px;
-  height: 48px;
-  margin-right: 16px;
+.token-card-symbol {
+  height: 68px;
+  width: 68px;
+  border-radius: 100%;
+  background: #dbeafe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.token-details {
+.token-card-symbol span {
+  color: #2563eb;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.token-info {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 1rem;
+  align-items: flex-start;
+  justify-content: center;
 }
 
-.token-details p {
-  line-height: 1.4;
+.token-info h4 {
+  font-size: 18px;
+  font-weight: 500;
+  color: #111827;
 }
 
-.contract-id {
-  font-size: 0.9rem;
-  color: #94a3b8;
+.token-info p {
+  font-size: 14px;
+  color: #6b7280;
 }
 
-.truncate-text {
-  display: inline-block;
-  max-width: 100%;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  vertical-align: middle;
+.token-amount {
+}
+
+.token-amount .amount {
+  font-size: 24px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.token-amount .formatted-amount {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.token-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.transfer-btn {
+  background: #4f46e5;
+  color: #fff;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+}
+
+.transfer-btn:hover {
+  background: #4338ca;
+}
+
+.details-btn {
+  background: #fff;
+  color: #111827;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  cursor: pointer;
+}
+
+.details-btn:hover {
+  background: #f9fafb;
 }

@@ -1,0 +1,11 @@
+.container-admin {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .container-admin {
+    flex-direction: row;
+  }
+}
