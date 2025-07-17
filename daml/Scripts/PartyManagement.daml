@@ -292,3 +292,10 @@ registerPartiesAndUpdateContracts admin partyNames = do
   updateAllContractsWithNewObservers admin
   
   return newParties
+
+-- Unregister a party and remove it from all contracts
+unregisterPartyAndRemoveFromContracts : Party -> Text -> Script ()
+unregisterPartyAndRemoveFromContracts admin name = do
+  removeParty admin name
+  updateAllContractsWithNewObservers admin
+  return ()

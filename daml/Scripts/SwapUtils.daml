@@ -8,7 +8,7 @@ import Exchange.TokenPair
 import Exchange.TokenSwapUtils
 
 -- Create a swap request with token locking
-createSwapWithTokenLocking: Party -> Party -> Party -> (Party, Party) -> (Party, (Party, Text), (Party, Text)) -> Decimal -> Decimal -> Decimal -> Party -> Script (ContractId SwapRequest)
+createSwapWithTokenLocking: Party -> Party -> Party -> (Party, Party, Text) -> (Party, (Party, Text), (Party, Text)) -> Decimal -> Decimal -> Decimal -> Party -> Script (ContractId SwapRequest)
 createSwapWithTokenLocking swapper admin liquidityProvider inputTokenLedgerKey tokenPairKey inputAmount expectedOutputAmount slippageTolerance registryKey = do
   -- Validate token pair's existence
   tokenPairOpt <- queryContractKey @TokenPair swapper tokenPairKey
@@ -45,7 +45,7 @@ data SwapParams = SwapParams
     swapper: Party
     admin: Party
     liquidityProvider: Party
-    inputTokenLedgerKey: (Party, Party)
+    inputTokenLedgerKey: (Party, Party, Text)
     tokenPairKey: (Party, (Party, Text), (Party, Text))
     inputAmount: Decimal
     expectedOutputAmount: Decimal

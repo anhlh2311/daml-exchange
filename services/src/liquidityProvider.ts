@@ -1,4 +1,4 @@
-import { ContractId, Party } from '@daml/types';
+import { ContractId, Party, Text } from '@daml/types';
 import { SwapRequest } from '@daml.js/exchange-0.0.1/lib/Exchange/TokenSwap';
 import { TokenLedger } from '@daml.js/exchange-0.0.1/lib/Currency/TokenLedger';
 import { LedgerService } from './ledger';
@@ -179,7 +179,7 @@ export class LiquidityProviderService {
 
       // Construct the output token ledger key for the LP
       // Use the full party ID from the payload, not the display name from config
-      const outputTokenLedgerKey: [Party, Party] = [lpOutputTokenOwner, payload.liquidityProvider];
+      const outputTokenLedgerKey: [Party, Party, Text] = [lpOutputTokenOwner, payload.liquidityProvider, lpOutputTokenSymbol];
 
       logger.info('Attempting to accept swap request', {
         contractId,
@@ -221,7 +221,7 @@ export class LiquidityProviderService {
   // Manual control methods for when auto-accept is disabled
   async manualAcceptSwap(
     contractId: ContractId<SwapRequest>, 
-    outputTokenLedgerKey: [Party, Party]
+    outputTokenLedgerKey: [Party, Party, Text]
   ): Promise<void> {
     try {
       logger.info('Manually accepting swap request', { contractId, outputTokenLedgerKey });

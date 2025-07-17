@@ -23,14 +23,11 @@ template SwapRequest
     signatory swapper
     observer admin, liquidityProvider
 
-    key (swapper, tokenPairKey) : (Party, (Party, (Party, Text), (Party, Text)))
-    maintainer key._1
-
     ensure inputAmount > 0.0 && expectedOutputAmount > 0.0 && rangeValidation 0.0 1.0 slippageTolerance
 
     choice AcceptSwap: (ContractId TokenLedger, ContractId SwapRequest)
       with
-        outputTokenLedgerKey: (Party, Party)
+        outputTokenLedgerKey: (Party, Party, Text)
       controller liquidityProvider
       do
         ensurePartyIsRegistered registryKey liquidityProvider liquidityProvider
@@ -107,7 +104,7 @@ template SwapRequestSetup
     swapper: Party
     admin: Party
     liquidityProvider: Party
-    inputTokenLedgerKey: (Party, Party)
+    inputTokenLedgerKey: (Party, Party, Text)
     tokenPairKey: (Party, (Party, Text), (Party, Text))
     inputAmount: Decimal
     expectedOutputAmount: Decimal

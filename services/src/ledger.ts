@@ -1,5 +1,5 @@
 import { Ledger } from '@daml/ledger';
-import { Party, ContractId } from '@daml/types';
+import { Party, Text, ContractId } from '@daml/types';
 import { SwapRequest } from '@daml.js/exchange-0.0.1/lib/Exchange/TokenSwap';
 import { TokenLedger, TokenTransferLock } from '@daml.js/exchange-0.0.1/lib/Currency/TokenLedger';
 import { config } from './config';
@@ -124,7 +124,7 @@ export class LedgerService {
 
   async acceptSwapRequest(
     contractId: ContractId<SwapRequest>, 
-    outputTokenLedgerKey: [Party, Party]
+    outputTokenLedgerKey: [Party, Party, Text]
   ): Promise<[any, any]> {
     const { client, party } = this.getConnection();
     
@@ -136,12 +136,12 @@ export class LedgerService {
       });
       
       // Convert JavaScript array to Daml Tuple2
-      const tuple2Key = { _1: outputTokenLedgerKey[0], _2: outputTokenLedgerKey[1] };
+      const tuple3Key = { _1: outputTokenLedgerKey[0], _2: outputTokenLedgerKey[1], _3: outputTokenLedgerKey[2] };
       
       const result = await client.exercise(
         SwapRequest.AcceptSwap,
         contractId,
-        { outputTokenLedgerKey: tuple2Key }
+        { outputTokenLedgerKey: tuple3Key }
       );
       
       logger.info('Successfully accepted swap request', { 

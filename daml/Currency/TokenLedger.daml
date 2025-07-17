@@ -15,7 +15,7 @@ template TokenLedger
     signatory holder
     observer owner  -- Only owner can see all balances, no other observers
 
-    key (owner, holder): (Party, Party)
+    key (owner, holder, symbol): (Party, Party, Text)
     maintainer key._2
 
     ensure amount >= 0.0
@@ -74,7 +74,7 @@ template TokenMaster
         assertMsg "Mint amount must be positive" (amount > 0.0)
 
         -- fetch the token contract for the owner
-        currentTokenLedger <- lookupByKey @TokenLedger (owner, owner)
+        currentTokenLedger <- lookupByKey @TokenLedger (owner, owner, metadata.symbol)
         
         newTokenLedgerCid <- case currentTokenLedger of
           Some currentTokenLedgerCid -> do
@@ -164,9 +164,6 @@ template TokenTransferLock
     signatory sender
     observer recipient, owner
 
-    key (sender, recipient): (Party, Party)
-    maintainer key._1
-
     -- Accept: recipient receives the tokens, merging with their own balance if needed
     choice Accept: ContractId TokenLedger
       controller recipient
@@ -175,7 +172,7 @@ template TokenTransferLock
         ensurePartyIsRegistered registryKey recipient recipient
 
         -- Lookup the recipient's TokenLedger contract
-        recipientLedger <- lookupByKey @TokenLedger (owner, recipient)
+        recipientLedger <- lookupByKey @TokenLedger (owner, recipient, symbol)
 
         case recipientLedger of
           -- If the recipient already has a TokenLedger contract, merge the balances
@@ -218,7 +215,7 @@ template TokenTransferLock
         ensurePartyIsRegistered registryKey sender sender
 
         -- Lookup the sender's TokenLedger contract
-        senderLedgerOpt <- lookupByKey @TokenLedger (owner, sender)
+        senderLedgerOpt <- lookupByKey @TokenLedger (owner, sender, symbol)
 
         case senderLedgerOpt of
           -- If the sender already has a TokenLedger contract, merge the balances
