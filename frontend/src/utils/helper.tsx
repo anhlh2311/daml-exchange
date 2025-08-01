@@ -1,0 +1,136 @@
+import jwtEncode from "jwt-encode";
+import { isRunningOnHub } from "@daml/hub-react";
+import Ledger, { CanReadAs } from "@daml/ledger";
+import { Role } from "stores/authStore";
+import { ListTokenProps, RateType } from "hooks/useGetTokenPair";
+export const createToken = (party: string): string => {
+  const payload = {
+    "https://daml.com/ledger-api": {
+      ledgerId: "participant",
+      applicationId: "my-app",
+      actAs: [party],
+      readAs: [party],
+    },
+    exp: Math.floor(Date.now() / 1000) + 3600,
+  };
+
+  const secret = "secret";
+  return jwtEncode(payload, secret);
+};
+
+export type UserManagement = {
+  tokenPayload: (loginName: string, ledgerId: string) => Object;
+  primaryParty: (loginName: string, ledger: Ledger) => Promise<string>;
+  publicParty: (loginName: string, ledger: Ledger) => Promise<string>;
+};
+
+export type Insecure = {
+  provider: "none";
+  userManagement: UserManagement;
+  makeToken: (party: string) => string;
+};
+
+export type DamlHub = {
+  provider: "daml-hub";
+};
+
+export type Authentication = Insecure | DamlHub;
+
+export const userManagement: UserManagement = {
+  tokenPayload: (loginName: string, ledgerId: string) => ({
+    sub: loginName,
+    scope: "daml_ledger_api",
+  }),
+  primaryParty: async (loginName, ledger: Ledger) => {
+    const user = await ledger.getUser();
+    if (user.primaryParty !== undefined) {
+      return user.primaryParty;
+    } else {
+      throw new Error(`User '${loginName}' has no primary party`);
+    }
+  },
+  publicParty: async (loginName, ledger: Ledger) => {
+    const rights = await ledger.listUserRights();
+    const readAsRights: CanReadAs[] = rights.filter(
+      (x): x is CanReadAs => x.type === "CanReadAs"
+    );
+    if (readAsRights.length === 0) {
+      throw new Error(
+        `User '${loginName} has no readAs claims for a public party`
+      );
+    } else if (readAsRights.length > 1) {
+      throw new Error(
+        `User '${loginName} has readAs claims for more than one party`
+      );
+    } else {
+      return readAsRights[0].party;
+    }
+  },
+};
+
+export const damlHub: DamlHub = {
+  provider: "daml-hub",
+};
+
+export const insecure: Insecure = (() => {
+  const ledgerId: string = "create-daml-app-sandbox";
+  return {
+    provider: "none" as "none",
+    userManagement: userManagement,
+    makeToken: (loginName: string) => {
+      const payload = userManagement.tokenPayload(loginName, ledgerId);
+      return jwtEncode(payload, "secret");
+    },
+  };
+})();
+
+export const authConfig: Authentication = (() =>
+  isRunningOnHub() ? damlHub : insecure)();
+
+export function getRoleFromDisplayName(displayName: string): Role {
+  if (displayName === "Admin") return "admin";
+  if (displayName === "BTCOwner" || displayName === "USDCOwner")
+    return "holder";
+  if (displayName === "LiquidityProvider") return "liquidity";
+  return "owner";
+}
+
+export function classNames(...classes: string[]) {
+  return classes.filter(Boolean).join(" ");
+}
+export const getBalanceToken = (
+  tokens: ListTokenProps[],
+  token: string | number | undefined
+) => {
+  const balanceToken = tokens.find((item) => item.symbol === token)?.balance;
+  if (!balanceToken) {
+    return "0";
+  }
+  return balanceToken;
+};
+
+export const calculateReceiveAmount = (
+  rate: RateType | null,
+  from: string,
+  to: string,
+  amount: string
+) => {
+  if (!rate || !from || !to || !amount) return "";
+
+  const amountNumber = parseFloat(amount);
+  const sellingPrice = parseFloat(rate.sellingPrice);
+  const buyingPrice = parseFloat(rate.buyingPrice);
+
+  if (from === "BTC" && to === "USDC")
+    return (amountNumber * buyingPrice).toFixed(6);
+  if (from === "USDC" && to === "BTC")
+    return (amountNumber / sellingPrice).toFixed(6);
+
+  return "0.000000";
+};
+
+export const buildTokenPairKey = (pair: any) => ({
+  _1: pair.payload.admin,
+  _2: pair.payload.baseTokenKey,
+  _3: pair.payload.quoteTokenKey,
+});

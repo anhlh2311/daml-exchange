@@ -37,6 +37,22 @@ testPartyManagement = do
 
   debug " +++ All tests completed successfully! +++"
 
+testMultipleRegistries = do
+  debug "Testing multiple registries..."
+  debug "-----------------------------------"
+
+  debug "Initialize registry"
+  cmdInit
+  debug "-----------------------------------"
+  
+  debug "Add parties: Alice, Bob, Charlie"
+  cmdAddParties ["Alice", "Bob", "Charlie"]
+  debug "-----------------------------------"
+  
+  debug "List parties: "
+  cmdListParties
+  debug "-----------------------------------"
+
 -- Demo script showing all functionality
 demoPartyManagement : Script ()
 demoPartyManagement = do

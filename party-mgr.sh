@@ -42,16 +42,18 @@ show_usage() {
     echo "Usage: $0 <script-name> [input]"
     echo ""
     echo "Available scripts:"
-    echo "  init                    - Initialize party registry"
-    echo "  add <party-name>        - Add a new party"
-    echo "  remove <party-name>     - Remove a party"
-    echo "  list                    - List all registered parties"
-    echo "  check <party-name>      - Check if party is registered"
-    echo "  demo                    - Run full demonstration"
+    echo "  init                           - Initialize party registry"
+    echo "  add <party-name>               - Add a new party (updates contracts)"
+    echo "  add-batch <party1,party2,...>  - Add multiple parties efficiently"
+    echo "  remove <party-name>            - Remove a party"
+    echo "  list                           - List all registered parties"
+    echo "  check <party-name>             - Check if party is registered"
+    echo "  demo                           - Run full demonstration"
     echo ""
     echo "Examples:"
     echo "  $0 init"
     echo "  $0 add Alice"
+    echo "  $0 add-batch Alice,Bob,Charlie"
     echo "  $0 remove Bob"
     echo "  $0 list"
     echo "  $0 check Alice"
@@ -83,6 +85,29 @@ execute_script() {
     fi
 }
 
+# Function to execute batch script with JSON array input
+execute_batch_script() {
+    local script_name="$1"
+    local party_list="$2"
+
+    print_info "Executing batch script: $script_name"
+    print_info "With parties: $party_list"
+
+    # Convert comma-separated list to JSON array
+    local json_array="["
+    IFS=',' read -ra PARTIES <<< "$party_list"
+    for i in "${!PARTIES[@]}"; do
+        if [ $i -gt 0 ]; then
+            json_array+=", "
+        fi
+        json_array+="\"${PARTIES[$i]}\""
+    done
+    json_array+="]"
+
+    print_info "JSON array: $json_array"
+    echo "$json_array" | daml script --ledger-host "$HOST" --ledger-port "$PORT" --dar "$DAR_FILE" --script-name "${SCRIPT_MODULE}:${script_name}" --input-file /dev/stdin
+}
+
 # Main script logic
 main() {
     # Check if at least one argument is provided
@@ -110,9 +135,21 @@ main() {
             echo "Usage: $0 add <party-name>"
             exit 1
         fi
-        print_info "Adding party: $input"
+        print_info "Adding party: $input (will update contract observers)"
         execute_script "cmdAddParty" "$input"
-        print_success "Party '$input' added successfully!"
+        print_success "Party '$input' added successfully with contract updates!"
+        ;;
+
+    "add-batch")
+        if [ -z "$input" ]; then
+            print_error "Comma-separated party list is required for 'add-batch' command"
+            echo "Usage: $0 add-batch <party1,party2,party3>"
+            echo "Example: $0 add-batch Alice,Bob,Charlie"
+            exit 1
+        fi
+        print_info "Adding multiple parties efficiently: $input"
+        execute_batch_script "cmdAddParties" "$input"
+        print_success "All parties added successfully with optimized contract updates!"
         ;;
 
     "remove")

@@ -1,0 +1,120 @@
+module Exchange.TokenListing where
+
+import Registry.PartyRegistryUtils
+
+template TokenListing
+  with
+    tokenOwner: Party
+    admin: Party
+    tokenMasterKey: (Party, Text)
+    registryKey: Party -- The registry key (Party)
+    observers: [Party]
+  where
+    signatory admin
+    observer tokenOwner, observers
+
+    key (admin, tokenMasterKey) : (Party, (Party, Text))
+    maintainer key._1
+
+    ensure tokenOwner == tokenMasterKey._1
+
+    nonconsuming choice RequestUnlisting : ContractId UnlistingRequest
+      controller tokenOwner
+      do
+        ensurePartyIsRegistered registryKey tokenOwner tokenOwner
+        create UnlistingRequest with
+          tokenOwner = tokenOwner
+          admin = admin
+          tokenMasterKey = tokenMasterKey
+          tokenListingCid = self
+          registryKey = registryKey
+
+    choice UpdateTokenListingObservers : ContractId TokenListing
+      controller admin
+      do
+        ensurePartyIsRegistered registryKey admin admin
+        (_, registry) <- getPartyRegistryByKey registryKey
+        
+        create this with
+          observers = registry.registeredParties
+
+template ListingRequest
+  with
+    tokenOwner: Party
+    admin: Party
+    tokenMasterKey: (Party, Text)
+    registryKey: Party -- The registry key (Party)
+  where
+    signatory tokenOwner
+    observer admin
+
+    key tokenMasterKey : (Party, Text)
+    maintainer key._1
+
+    ensure tokenOwner == tokenMasterKey._1
+
+    choice ApproveListing : ContractId TokenListing
+      controller admin
+      do
+        ensurePartyIsRegistered registryKey admin admin
+
+        (_, registry) <- getPartyRegistryByKey registryKey
+
+        -- check if the token is already listed
+        let tokenListingKey = (admin, tokenMasterKey)
+        tokenListingOpt <- lookupByKey @TokenListing tokenListingKey
+        case tokenListingOpt of
+          Some tokenListingCid -> do
+            tokenListing <- fetch tokenListingCid
+            assertMsg ("Token is already listed" <> show tokenListing) (tokenListing.tokenOwner == tokenOwner)
+            return tokenListingCid
+
+          None -> do
+            -- create the token listing
+            create TokenListing with
+              observers = registry.registeredParties
+              ..
+
+    choice RejectListing : ()
+      controller admin
+      do
+        ensurePartyIsRegistered registryKey admin admin
+        
+        archive self
+
+    choice CancelListing : ()
+      controller tokenOwner
+      do
+        ensurePartyIsRegistered registryKey tokenOwner tokenOwner
+        
+        archive self
+
+template UnlistingRequest
+  with
+    tokenOwner: Party
+    admin: Party
+    tokenMasterKey: (Party, Text)
+    tokenListingCid: ContractId TokenListing
+    registryKey: Party -- The registry key (Party)
+  where
+    signatory tokenOwner
+    observer admin
+
+    key (tokenOwner, admin, tokenMasterKey) : (Party, Party, (Party, Text))
+    maintainer key._1
+
+    choice ApproveUnlisting : ()
+      controller admin
+      do
+        ensurePartyIsRegistered registryKey admin admin
+        
+        tokenListing <- fetch tokenListingCid
+
+        assertMsg ("Token owner mismatch: " 
+          <> show tokenListing.tokenOwner <> " <> " 
+          <> show tokenOwner) (tokenListing.tokenOwner == tokenOwner)
+        assertMsg ("Token master key mismatch: " 
+          <> show tokenListing.tokenMasterKey <> " <> " 
+          <> show tokenMasterKey) (tokenListing.tokenMasterKey == tokenMasterKey)
+        
+        archive tokenListingCid

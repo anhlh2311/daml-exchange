@@ -1,0 +1,393 @@
+# Testing Guidelines for Exchange System
+
+## Test Structure and Organization
+
+### Test File Organization
+
+- All tests are in [daml/Test/](mdc:daml/Test/) directory
+- Each major component has its own test file
+- Tests follow the naming pattern: `ComponentNameTest.daml`
+
+### Test Scripts
+
+- [PartyManagementTest.daml](mdc:daml/Test/PartyManagementTest.daml): Party registration workflows
+- [PartyRegistryTest.daml](mdc:daml/Test/PartyRegistryTest.daml): Registry validation tests
+- [TokenLedgerTest.daml](mdc:daml/Test/TokenLedgerTest.daml): Token lifecycle tests
+- [TokenPairTest.daml](mdc:daml/Test/TokenPairTest.daml): Trading pair tests
+- [TokenSwapFlowTest.daml](mdc:daml/Test/TokenSwapFlowTest.daml): Complete swap workflows with slippage protection
+
+## Test Setup Patterns
+
+### Party Allocation
+
+```daml
+-- Use utility functions from Scripts
+admin <- allocateParty "Admin"
+alice <- allocateParty "Alice"
+bob <- allocateParty "Bob"
+```
+
+### Registry Initialization
+
+```daml
+-- Initialize party registry for all tests
+registryCid <- initializeRegistry
+adminOpt <- getAdminParty
+let admin = fromSome adminOpt
+```
+
+### Token Setup
+
+```daml
+-- Create token metadata
+metadata <- createMetadata "Test Token" "TEST" "Test token for testing" 6
+
+-- Setup token with initial supply
+setupCid <- submit owner do
+  createCmd TokenSetup with
+    owner = owner
+    initialSupply = 1000.0
+    metadata = metadata
+    registryKey = admin
+
+(masterCid, ledgerCid) <- submit owner do
+  exerciseCmd setupCid Initialize
+```
+
+### Swap Setup with Slippage Protection
+
+```daml
+-- Create swap request with slippage tolerance
+let 
+  inputAmount = 1095.12
+  expectedOutputAmount = calculateExpectedOutputAmount inputSymbol tokenPair inputAmount
+  slippageTolerance = 0.05 -- 5% tolerance
+
+swapRequestCid <- createSwapWithTokenLocking 
+  swapper admin lp 
+  inputTokenLedgerKey tokenPairKey 
+  inputAmount expectedOutputAmount 
+  slippageTolerance
+  admin
+```
+
+## Test Categories
+
+### 1. Unit Tests
+
+- Test individual template choices
+- Validate input parameters
+- Test error conditions and assertions
+- Test slippage tolerance validation
+
+### 2. Integration Tests
+
+- Test complete workflows across multiple templates
+- Validate business logic end-to-end
+- Test cross-component interactions
+- Test two-phase swap execution
+
+### 3. Workflow Tests
+
+- Test complete user journeys
+- Validate multi-step processes
+- Test error recovery scenarios
+- Test slippage protection scenarios
+
+## Common Test Patterns
+
+### Token Lifecycle Test
+
+```daml
+tokenLifecycleTest: Script ()
+tokenLifecycleTest = do
+  -- 1. Setup parties and registry
+  -- 2. Create token with metadata
+  -- 3. Mint initial supply
+  -- 4. Test transfers (lock/accept/reject/cancel)
+  -- 5. Test burning (partial and full)
+  -- 6. Verify final states
+```
+
+### Two-Phase Swap Workflow Test
+
+```daml
+testSwapSuccess: Script ()
+testSwapSuccess = do
+  -- 1. Setup two tokens and their owners
+  -- 2. Create listings for both tokens
+  -- 3. Create trading pair
+  -- 4. Setup initial balances for traders
+  -- 5. Create swap request with slippage tolerance
+  -- 6. LP accepts swap (Phase 1)
+  -- 7. Swapper finalizes swap (Phase 2)
+  -- 8. Verify final balances and token transfers
+```
+
+### Slippage Protection Test
+
+```daml
+testSlippageProtection: Script ()
+testSlippageProtection = do
+  -- 1. Create swap request with tight slippage tolerance
+  -- 2. Simulate market rate changes that exceed tolerance
+  -- 3. Verify LP acceptance fails with slippage error
+  -- 4. Test automatic rejection mechanism
+  -- 5. Verify swapper can cancel and recover tokens
+```
+
+### Error Condition Tests
+
+```daml
+testSwapFailureWithInsufficientInputAmount: Script ()
+testSwapFailureWithInsufficientInputAmount = do
+  -- Setup with limited balance
+  -- Attempt swap exceeding available balance
+  -- Verify appropriate error in createSwapWithTokenLocking
+
+testSwapFailureWithFinalizeBeforeAccept: Script ()
+testSwapFailureWithFinalizeBeforeAccept = do
+  -- Create swap request
+  -- Attempt to finalize before LP acceptance
+  -- Verify operation fails with appropriate error
+```
+
+## Validation Testing
+
+### Party Registration Validation
+
+- Test operations with unregistered parties
+- Verify `ensurePartyIsRegistered` enforcement
+- Test admin-only operations
+
+### Balance Validation
+
+- Test transfers with insufficient balance
+- Test negative amount transfers
+- Test zero amount transfers
+
+### Slippage Tolerance Validation
+
+```daml
+-- Test invalid slippage tolerance ranges
+testInvalidSlippageTolerance: Script ()
+testInvalidSlippageTolerance = do
+  -- Test negative slippage tolerance
+  submitMustFail swapper do
+    createCmd SwapRequest with
+      slippageTolerance = -0.05
+      -- other fields...
+  
+  -- Test slippage tolerance > 100%
+  submitMustFail swapper do
+    createCmd SwapRequest with
+      slippageTolerance = 1.5
+      -- other fields...
+```
+
+### Authorization Testing
+
+- Test operations by unauthorized parties
+- Verify controller restrictions
+- Test observer visibility rules
+- Test LP-only operations (AcceptSwap, RejectSwapRequest)
+- Test swapper-only operations (FinalizeSwap, CancelSwapRequest)
+
+### Direction-Aware Calculation Testing
+
+```daml
+-- Test both token directions in swap calculations
+testDirectionAwareCalculations: Script ()
+testDirectionAwareCalculations = do
+  -- Test input token -> quote token direction
+  let outputAmount1 = calculateExpectedOutputAmount inputSymbol tokenPair inputAmount
+  
+  -- Test quote token -> input token direction  
+  let outputAmount2 = calculateExpectedOutputAmount quoteSymbol tokenPair inputAmount
+  
+  -- Verify different calculations based on direction
+  assertMsg "Calculations should differ based on direction" (outputAmount1 /= outputAmount2)
+```
+
+## Test Utilities
+
+### Reusable Setup Functions
+
+- Use functions from [daml/Scripts/](mdc:daml/Scripts/) for common setup
+- Create test-specific utility functions
+- Maintain consistent party naming across tests
+
+### Swap Test Utilities
+
+```daml
+-- Helper function for creating swap requests
+createTestSwapRequest: Party -> Party -> Party -> Decimal -> Decimal -> Script (ContractId SwapRequest)
+createTestSwapRequest swapper admin lp inputAmount slippageTolerance = do
+  -- Common swap request creation logic
+  -- Calculate expected output amount
+  -- Create swap request with standard parameters
+
+-- Helper function for testing swap execution
+executeFullSwap: ContractId SwapRequest -> Party -> Party -> Script (ContractId TokenLedger)
+executeFullSwap swapRequestCid lp swapper = do
+  -- LP accepts swap
+  (_, acceptedSwapCid) <- submit lp do
+    exerciseCmd swapRequestCid AcceptSwap with
+      outputTokenLedgerKey = outputKey
+  
+  -- Swapper finalizes swap
+  submit swapper do
+    exerciseCmd acceptedSwapCid FinalizeSwap
+```
+
+### Assertion Patterns
+
+```daml
+-- Verify contract creation
+assertMsg (isSome contractOpt) "Contract should be created"
+
+-- Verify balance changes
+assertMsg (newBalance == expectedBalance) "Balance should match expected"
+
+-- Verify contract archival
+assertMsg (isNone contractOpt) "Contract should be archived"
+
+-- Verify slippage calculations
+let calculatedAmount = calculateExpectedOutputAmount symbol tokenPair inputAmount
+assertMsg "Calculated amount should match expected" (calculatedAmount == expectedAmount)
+```
+
+## Test Configuration
+
+### daml.yaml Test Configuration
+
+```yaml
+tests:
+  - Test.PartyManagementTest:partyManagementTest
+  - Test.PartyRegistryTest:partyRegistryTest
+  - Test.TokenLedgerTest:tokenLedgerTest
+  - Test.TokenPairTest:tokenPairTest
+  - Test.TokenSwapFlowTest:testSwapSuccess
+  - Test.TokenSwapFlowTest:testSwapFailureWithInsufficientInputAmount
+  - Test.TokenSwapFlowTest:testSwapFailureWithFinalizeSwapBeforeAcceptSwap
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+daml test
+
+# Run specific test file
+daml test --files ./daml/Test/TokenSwapFlowTest.daml
+
+# Run specific test function
+daml test --files ./daml/Test/TokenSwapFlowTest.daml --test-pattern testSwapSuccess
+```
+
+## Advanced Testing Patterns
+
+### Slippage Edge Cases
+
+```daml
+-- Test slippage at exact tolerance boundary
+testSlippageAtBoundary: Script ()
+testSlippageAtBoundary = do
+  -- Create swap with 5% tolerance
+  -- Simulate exactly 5% rate change
+  -- Verify swap still succeeds
+  
+-- Test slippage just over tolerance
+testSlippageOverTolerance: Script ()
+testSlippageOverTolerance = do
+  -- Create swap with 5% tolerance
+  -- Simulate 5.1% rate change
+  -- Verify swap fails with slippage error
+```
+
+### Two-Phase Execution Edge Cases
+
+```daml
+-- Test LP acceptance without swapper finalization
+testIncompleteSwap: Script ()
+testIncompleteSwap = do
+  -- LP accepts swap
+  -- Verify intermediate state is correct
+  -- Verify swapper can still finalize or cancel
+  
+-- Test multiple concurrent swaps
+testConcurrentSwaps: Script ()
+testConcurrentSwaps = do
+  -- Create multiple swap requests
+  -- Test LP can handle multiple swaps
+  -- Verify proper token locking and unlocking
+```
+
+### Rate Validation Testing
+
+```daml
+-- Test real-time rate validation
+testRealTimeRateValidation: Script ()
+testRealTimeRateValidation = do
+  -- Create swap request
+  -- Update token pair rates
+  -- Verify LP acceptance uses current rates
+  -- Verify slippage calculated against current rates
+```
+
+## Test Documentation
+
+### Test Naming
+
+- Use descriptive test names that explain the scenario
+- Follow pattern: `testComponentActionScenario`
+- Include expected outcome in test name
+- Examples: `testSwapSuccessWithSlippageProtection`, `testSwapFailureExceedsSlippage`
+
+### Test Comments
+
+```daml
+-- | Tests the complete two-phase swap execution with slippage protection
+-- | Verifies: swap creation, LP acceptance, swapper finalization, slippage validation
+testSwapSuccess: Script ()
+
+-- | Tests slippage protection when market rates exceed tolerance
+-- | Verifies: automatic rejection, error messages, token recovery
+testSlippageProtection: Script ()
+```
+
+### Test Organization
+
+- Group related tests together
+- Use clear section comments
+- Maintain logical flow from setup to verification
+- Separate happy path tests from error condition tests
+
+## Performance Testing
+
+### Large Volume Testing
+
+```daml
+-- Test with large token amounts
+testLargeVolumeSwap: Script ()
+testLargeVolumeSwap = do
+  -- Create swap with large amounts
+  -- Verify calculations remain accurate
+  -- Test performance with large numbers
+```
+
+### Multiple Swap Testing
+
+```daml
+-- Test multiple sequential swaps
+testMultipleSwaps: Script ()
+testMultipleSwaps = do
+  -- Execute multiple swaps in sequence
+  -- Verify balance consistency
+  -- Test system stability under load
+```
+
+description: Testing guidelines
+globs: daml/Test/*.daml
+
+---

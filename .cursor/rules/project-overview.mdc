@@ -1,0 +1,120 @@
+# Daml Token Exchange System - Project Overview
+
+This is a sophisticated decentralized token exchange system built on Daml with four core workflow areas:
+
+## System Architecture
+
+### 1. Registry System (Party Management)
+
+- **PartyRegistry**: Central authority for managing party registration
+- **PartyRegistryUtils**: Validation and lookup utilities
+- Located in [daml/Registry/](mdc:daml/Registry/)
+
+### 2. Currency System (Token Management)
+
+- **TokenLedger**: Individual token balances with secure transfer mechanism
+- **TokenMaster**: Controls token supply and minting/burning
+- **TokenMetadata**: Token information (name, symbol, decimals)
+- Located in [daml/Currency/](mdc:daml/Currency/)
+
+### 3. Exchange System (Trading Infrastructure)
+
+- **TokenListing**: Manages which tokens are available for trading
+- **TokenPair**: Defines active trading pairs with exchange rates
+- **TokenSwap**: Executes token swaps with enhanced slippage protection
+- **SwapRequest**: Simplified single-template swap execution with two-phase model
+- Located in [daml/Exchange/](mdc:daml/Exchange/)
+
+### 4. Scripts and Utilities
+
+- **PartyManagement**: Party allocation and registration scripts
+- **SetupUtils**: System initialization utilities
+- **SwapUtils**: Trading pair and swap execution utilities
+- **TokenSwapUtils**: Enhanced calculation and validation functions
+- Located in [daml/Scripts/](mdc:daml/Scripts/)
+
+## Key Entry Points
+
+- **Main Setup**: [daml/Main.daml](mdc:daml/Main.daml) - System initialization script
+- **Configuration**: [daml.yaml](mdc:daml.yaml) - Project configuration and dependencies
+- **Documentation**: [README.md](mdc:README.md) - Comprehensive system documentation
+- **Workflow Guide**: [WORKFLOW.md](mdc:WORKFLOW.md) - Detailed workflow documentation
+
+## Core Design Principles
+
+1. **Privacy-First**: Only relevant parties can see contracts
+2. **Two-Step Transfers**: Lock/Accept pattern for secure token transfers
+3. **Two-Phase Swaps**: Enhanced swap execution with LP acceptance and swapper finalization
+4. **Admin-Controlled**: Centralized admin for listing and pair management
+5. **Validation-Heavy**: All operations validate party registration and permissions
+6. **Slippage Protection**: Configurable tolerance with real-time rate validation
+7. **Direction-Aware**: Smart calculations based on token flow direction
+8. **Extensible**: Metadata-driven design for token properties
+
+## Enhanced Swap Features
+
+### 1. Simplified Architecture
+
+- **Single Template**: SwapRequest handles complete swap lifecycle
+- **Direct Interaction**: LP interacts directly with SwapRequest (no intermediate templates)
+- **Streamlined Choices**: AcceptSwap, FinalizeSwap, CancelSwapRequest, RejectSwapRequest
+
+### 2. Slippage Protection
+
+- **Configurable Tolerance**: Swappers set acceptable slippage percentage (0-100%)
+- **Real-time Validation**: Current rates checked against tolerance at LP acceptance
+- **Automatic Rejection**: Swaps exceeding tolerance are automatically rejected
+- **Range Validation**: Slippage tolerance validated within acceptable bounds
+
+### 3. Two-Phase Execution
+
+- **Phase 1 (LP Accept)**: LP validates, locks output tokens, receives input tokens immediately
+- **Phase 2 (Swapper Finalize)**: Swapper completes swap by accepting output tokens
+- **Atomic Operations**: Each phase is atomic, preventing partial state inconsistencies
+
+### 4. Direction-Aware Calculations
+
+- **Smart Pricing**: calculateExpectedOutputAmount handles input vs quote token direction
+- **Dynamic Rates**: Proper buying/selling price selection based on token flow
+- **Consistent Application**: Ensures accurate pricing regardless of swap direction
+
+## Testing Strategy
+
+Comprehensive test suite in [daml/Test/](mdc:daml/Test/) covering:
+
+- Party management workflows
+- Token lifecycle (mint → transfer → burn)
+- Trading pair setup and management
+- Two-phase swap execution flows
+- Slippage protection scenarios
+- Direction-aware calculation validation
+- Error recovery and cancellation flows
+
+## Key Improvements in Swap Redesign
+
+### Enhanced Security
+
+- Real-time rate validation prevents stale price execution
+- Slippage protection prevents unfavorable swaps
+- Two-phase execution ensures both parties fulfill obligations
+
+### Improved User Experience
+
+- Configurable slippage tolerance for market volatility
+- Clear error messages for failed operations
+- Multiple recovery paths for different failure scenarios
+
+### System Efficiency
+
+- Reduced contract complexity with single SwapRequest template
+- Streamlined choices for cleaner interaction patterns
+- Direction-aware calculations eliminate manual rate selection
+
+### Market Responsiveness
+
+- Current rates validated at time of LP decision
+- Flexible slippage tolerance for different market conditions
+- Automatic rejection when rates exceed acceptable bounds
+alwaysApply: true
+
+---

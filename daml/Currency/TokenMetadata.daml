@@ -16,14 +16,14 @@ data TokenMetadata = TokenMetadata
     version : Text           -- Token contract version
   deriving (Eq, Show)
 
-createMetadata: Text -> Text -> Script TokenMetadata
-createMetadata name symbol = do
+createMetadata: Text -> Text -> Text -> Int -> Script TokenMetadata
+createMetadata name symbol description decimals = do
   now <- getTime
   return TokenMetadata with
     name = name
     symbol = symbol
-    decimals = 6
-    description = ""
+    decimals = decimals
+    description = description
     issuedDate = now
     version = "1.0.0"
   

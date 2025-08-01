@@ -1,9 +1,19 @@
-sdk-version: 2.10.0
+sdk-version: 2.10.1
 name: exchange
 source: daml
 init-script: Main:setup
+ledger-id: exchange-ledger
+codegen:
+  js:
+    output-directory: daml.js
+    npm-scope: daml.js
 version: 0.0.1
 dependencies:
   - daml-prim
   - daml-stdlib
   - daml-script
+tests:
+  - Test.PartyManagementTest:partyManagementTest
+  - Test.PartyRegistryTest:partyRegistryTest
+  - Test.TokenLedgerTest:tokenLedgerTest
+  - Test.TokenPairTest:tokenPairTest

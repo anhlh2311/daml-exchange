@@ -1,0 +1,201 @@
+# Exchange System Workflow Patterns
+
+## 1. Party Registration Workflow
+
+### Registration Process
+
+1. **Admin** creates [PartyRegistry](mdc:daml/Registry/PartyRegistry.daml) contract
+2. **Admin** registers parties using `RegisterParty` choice
+3. All operations validate party registration through [PartyRegistryUtils](mdc:daml/Registry/PartyRegistryUtils.daml)
+
+### Validation Pattern
+
+```daml
+-- Every operation must validate party registration
+ensurePartyIsRegistered registryKey party
+```
+
+## 2. Token Management Workflow
+
+### Token Creation and Minting
+
+1. **Token Owner** creates [TokenSetup](mdc:daml/Currency/TokenLedger.daml) with metadata
+2. **Token Owner** calls `Initialize` to create [TokenMaster](mdc:daml/Currency/TokenLedger.daml) and initial [TokenLedger](mdc:daml/Currency/TokenLedger.daml)
+3. **Token Owner** can mint tokens using `Mint` choice on TokenMaster
+
+### Token Transfer Process (Two-Step)
+
+1. **Sender** calls `LockTokenForTransfer` on their [TokenLedger](mdc:daml/Currency/TokenLedger.daml)
+2. Creates [TokenTransferLock](mdc:daml/Currency/TokenLedger.daml) contract
+3. **Recipient** can:
+   - `Accept`: Receive tokens into their TokenLedger
+   - `Reject`: Create reverse lock back to sender
+4. **Sender** can `Cancel` pending transfers
+
+### Token Burning
+
+1. **Token Owner** calls `Burn` on [TokenMaster](mdc:daml/Currency/TokenLedger.daml)
+2. Can burn partial amount (returns remaining TokenLedger) or full amount
+3. Total supply is reduced accordingly
+
+## 3. Exchange Listing Workflow
+
+### Token Listing Process
+
+1. **Token Owner** creates [ListingRequest](mdc:daml/Exchange/TokenListing.daml)
+2. **Admin** reviews and either:
+   - `ApproveListing`: Creates active [TokenListing](mdc:daml/Exchange/TokenListing.daml)
+   - `RejectListing`: Archives the request
+3. **Token Owner** can request unlisting via `UnlistingRequest`
+
+### Listing Validation
+
+- Token must have active [TokenMaster](mdc:daml/Currency/TokenLedger.daml) contract
+- Token owner must be registered in [PartyRegistry](mdc:daml/Registry/PartyRegistry.daml)
+- Admin must approve all listing operations
+
+## 4. Trading Pair Workflow
+
+### Pair Creation Process
+
+1. **Admin** creates [TokenPairSetup](mdc:daml/Exchange/TokenPair.daml) with two listed tokens
+2. System validates both tokens have active [TokenListing](mdc:daml/Exchange/TokenListing.daml) contracts
+3. **Admin** calls `CreateTokenPair` with initial exchange rates
+4. Creates active [TokenPair](mdc:daml/Exchange/TokenPair.daml) contract
+
+### Rate Management
+
+- **Admin** can update exchange rates using `SetRate`
+- **Admin** can remove trading pairs using `RemoveTokenPair`
+- Rates are maintained as separate buying and selling prices
+
+## 5. Swap Execution Workflow (Redesigned)
+
+### Swap Initiation Process
+
+1. **Swapper** calls `createSwapWithTokenLocking` utility function from [SwapUtils](mdc:daml/Scripts/SwapUtils.daml)
+2. System validates TokenPair exists and is active
+3. Calculates expected output amount using `calculateExpectedOutputAmount` with direction awareness
+4. Locks input tokens via TokenTransferLock for the liquidity provider
+5. Creates [SwapRequest](mdc:daml/Exchange/TokenSwap.daml) with swap details, expected output, and slippage tolerance
+
+### Two-Phase Swap Execution
+
+#### Phase 1 - LP Acceptance
+
+1. **Liquidity Provider** reviews [SwapRequest](mdc:daml/Exchange/TokenSwap.daml) directly
+2. **LP** calls `AcceptSwap` choice on SwapRequest
+3. System validates current rates against slippage tolerance using real-time rate checking
+4. LP's output tokens are locked for the swapper
+5. LP immediately receives input tokens from the locked transfer
+6. SwapRequest is updated with output token lock information
+
+#### Phase 2 - Swapper Finalization
+
+1. **Swapper** calls `FinalizeSwap` choice on the updated SwapRequest
+2. Swapper receives the locked output tokens
+3. Swap is completed atomically
+
+### Enhanced Slippage Protection
+
+- **Configurable Tolerance**: Swappers set acceptable slippage percentage (0-100%)
+- **Real-time Validation**: Current rates checked against tolerance at LP acceptance time
+- **Automatic Rejection**: Swaps exceeding tolerance are automatically rejected
+- **Range Validation**: Slippage tolerance validated using `rangeValidation` function
+
+### Direction-Aware Calculations
+
+- Uses `calculateExpectedOutputAmount` from [TokenSwapUtils](mdc:daml/Exchange/TokenSwapUtils.daml)
+- Handles input vs quote token direction automatically
+- Applies proper buying/selling price selection based on token flow
+
+### Cancellation and Rejection Flows
+
+- **Swapper** can `CancelSwapRequest` to retrieve locked tokens
+- **LP** can `RejectSwapRequest` to create reverse lock for swapper
+- All cancellations return tokens to original holders safely
+
+### Swap Validation
+
+- Enhanced rate validation with slippage protection
+- Current TokenPair rates checked at time of LP decision
+- Balance validation for both input and output tokens
+- Party registration validation for all participants
+
+## 6. Utility Functions
+
+### Party Management
+
+- [PartyUtils](mdc:daml/Scripts/PartyUtils.daml): Party allocation and registration helpers
+- [PartyManagement](mdc:daml/Scripts/PartyManagement.daml): Party management scripts
+
+### Setup Utilities
+
+- [SetupUtils](mdc:daml/Scripts/SetupUtils.daml): System initialization helpers
+- [TokenPairUtils](mdc:daml/Scripts/TokenPairUtils.daml): Trading pair creation utilities
+
+### Swap Utilities
+
+- [SwapUtils](mdc:daml/Scripts/SwapUtils.daml): Swap execution and validation helpers
+- [TokenSwapUtils](mdc:daml/Exchange/TokenSwapUtils.daml): Enhanced calculation and validation functions
+
+## Key Business Rules
+
+### Privacy Rules
+
+- TokenLedger: Only holder and owner can see
+- TokenTransferLock: Only sender, recipient, and owner can see
+- TokenListing: Admin and token owner can see
+- TokenPair: All registered parties can observe
+- SwapRequest: Only swapper, admin, and liquidity provider can see
+
+### Authorization Rules
+
+- Only token owners can mint/burn their tokens
+- Only token holders can initiate transfers
+- Only admin can approve listings and manage pairs
+- Only registered parties can participate in swaps
+- Only liquidity providers can accept/reject swap requests
+
+### Validation Rules
+
+- All amounts must be positive
+- Sufficient balance checks for all transfers
+- Party registration validation for all operations
+- Token pair must be active for swaps
+- Slippage tolerance must be within 0-100% range
+- Current rates validated against slippage at LP acceptance time
+
+## Updated Swap Design Features
+
+### 1. Simplified Architecture
+
+- **Single Template Approach**: Removed LiquidityResponse template for direct SwapRequest interaction
+- **Streamlined Choices**: `AcceptSwap`, `FinalizeSwap`, `CancelSwapRequest`, `RejectSwapRequest`
+- **Reduced Complexity**: Fewer contracts to manage while maintaining security
+
+### 2. Enhanced Slippage Protection
+
+- **Configurable Tolerance**: Swappers set acceptable slippage percentage
+- **Real-time Validation**: Current rates checked against tolerance at LP acceptance time
+- **Automatic Rejection**: Swaps exceeding tolerance are automatically rejected
+
+### 3. Improved Calculation Logic
+
+- **Direction-Aware Calculations**: `calculateExpectedOutputAmount` handles input vs quote token direction
+- **Dynamic Rate Application**: Proper buying/selling price selection based on token flow
+- **Range Validation**: Ensures slippage tolerance within acceptable bounds
+
+### 4. Two-Phase Execution Model
+
+- **Phase 1 (LP Accept)**: LP validates, locks output tokens, receives input tokens immediately
+- **Phase 2 (Swapper Finalize)**: Swapper accepts output tokens to complete swap
+- **Atomic Phases**: Each phase is atomic, preventing partial state inconsistencies
+
+### 5. Enhanced Error Recovery
+
+- **Reverse Lock Creation**: LP rejection creates automatic recovery path for swappers
+- **Multiple Cancel Options**: Swappers can cancel at different stages
+- **Graceful Degradation**: System handles various failure scenarios with token recovery
+
+---

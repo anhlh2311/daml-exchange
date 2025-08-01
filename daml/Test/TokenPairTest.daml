@@ -1,0 +1,337 @@
+module Test.TokenPairTest where
+
+import Daml.Script
+import DA.Assert ((===))
+import DA.Optional (fromSome)
+
+import Currency.TokenLedger
+import Currency.TokenMetadata
+import Exchange.TokenPair
+import Exchange.TokenListing
+-- import Registry.PartyRegistry
+
+import Scripts.PartyManagement
+import Scripts.PartyUtils
+import Scripts.SetupUtils
+
+
+tokenPairTest : Script ()
+tokenPairTest = script do
+  -- Registry setup & party registration
+  registryCid <- initializeRegistry
+  adminOpt <- getAdminParty
+  let admin = fromSome adminOpt
+  [lp, btcOwner, usdtOwner] <- allocateAndRegisterParties admin ["LiquidityProvider", "BtcOwner", "UsdtOwner"]
+
+  -- Token setup
+  btcMetadata <- createMetadata "Bitcoin" "BTC" "Decentralized digital currency" 8
+  usdtMetadata <- createMetadata "Tether" "USDT" "Stablecoin pegged to USD" 6
+
+  -- Initializing BTC and USDT tokens
+  (btcMasterCid, btcLedgerCid) <- createToken
+    btcOwner btcMetadata 100.0 admin
+
+  (usdtMasterCid, usdtLedgerCid) <- createToken
+    usdtOwner usdtMetadata 1000000.0 admin
+
+  -- Create token listings
+  let
+    btcMasterKey = (btcOwner, btcMetadata.symbol)
+    usdtMasterKey = (usdtOwner, usdtMetadata.symbol)
+
+  -- create btc token listing
+  (btcListingCid, btcListingKey) <- createTokenListing btcOwner admin btcMetadata.symbol admin
+
+  -- create usdt token listing
+  (usdtListingCid, usdtListingKey) <- createTokenListing usdtOwner admin usdtMetadata.symbol admin
+
+  -- Create token pair using listings
+  tokenPairSetupCid <- createTokenPairSetup admin lp btcMasterKey usdtMasterKey admin
+
+  -- Creating a duplicate token pair setup should fail right away
+  debug "Creating a duplicate token pair setup should fail."
+  submitMustFail admin do
+    createCmd TokenPairSetup with
+      admin
+      liquidityProvider = lp
+      inputListingKey = btcListingKey
+      quoteListingKey = usdtListingKey
+      registryKey = admin
+
+  tokenPairCid <- createTokenPairWithSetup admin tokenPairSetupCid 103500.0 103000.0 admin
+
+  -- Mint and burn tokens
+  (newBtcMasterCid, newBtcLedgerCid) <- submit btcOwner do
+    exerciseCmd btcMasterCid Mint with amount = 10.0
+  (newUsdtMasterCid, newUsdtLedgerCid) <- submit usdtOwner do
+    exerciseCmd usdtMasterCid Mint with amount = 50000.0
+
+  -- Burn some of the newly minted tokens
+  (finalBtcMasterCid, _) <- submit btcOwner do
+    exerciseCmd newBtcMasterCid Burn with tokenCid = newBtcLedgerCid, amountToBurn = Some 5.0
+  (finalUsdtMasterCid, _) <- submit usdtOwner do
+    exerciseCmd newUsdtMasterCid Burn with tokenCid = newUsdtLedgerCid, amountToBurn = Some 10000.0
+
+  -- Validate token pair state after mint/burn operations
+  tokenPairData <- submit admin do exerciseCmd tokenPairCid GetData
+  tokenPairData.baseTokenKey === btcMasterKey
+  tokenPairData.quoteTokenKey === usdtMasterKey
+
+  -- Test choices
+  (sellingPrice, buyingPrice) <- submit admin do exerciseCmd tokenPairCid GetRate with requester = admin
+  sellingPrice === 103500.0 
+  buyingPrice === 103000.0
+
+  -- Liquidity Provider is now an observer and cannot call choices
+  submitMustFail lp do
+    exerciseCmd tokenPairCid GetLiquidityProvider
+
+  lpInLedger <- submit admin do exerciseCmd tokenPairCid GetLiquidityProvider
+  lpInLedger === lp
+
+  updatedTokenPairCid <- submit admin do
+    exerciseCmd tokenPairCid SetRate with
+      newSellingPrice = 104000.0
+      newBuyingPrice = 103500.0
+
+  (newSellingPrice, newBuyingPrice) <- submit admin do 
+    exerciseCmd updatedTokenPairCid GetRate with requester = admin
+  newSellingPrice === 104000.0
+  newBuyingPrice === 103500.0
+
+  -- Other test cases:
+  -- 1. Edge cases for SetRate:
+  --  
+  -- Setting buying price equal to selling price should succeed
+  debug "Setting buying price equal to selling price"
+  tokenPairSetRateEqualCid <- submit admin do
+    exerciseCmd updatedTokenPairCid SetRate with
+      newSellingPrice = 104000.0
+      newBuyingPrice = 104000.0
+
+  -- Verify that the rates are set correctly
+  debug "Verifying that the rates are set correctly"
+  (newSellingPrice, newBuyingPrice) <- submit admin do
+    exerciseCmd tokenPairSetRateEqualCid GetRate with requester = admin
+  newSellingPrice === 104000.0
+  newBuyingPrice === 104000.0
+  debug $ "New selling price: " <> show newSellingPrice
+  debug $ "New buying price: " <> show newBuyingPrice
+
+  -- Setting buying price greater than selling price should fail
+  debug "Setting buying price greater than selling price should fail"
+  tokenPairSetRateBuyingPriceGreaterThanSellingPriceCid <- submitMustFail admin do
+    exerciseCmd tokenPairSetRateEqualCid SetRate with
+      newSellingPrice = 104000.0
+      newBuyingPrice = 105000.0
+
+  -- Setting non-positive prices should fail
+  debug "Setting non-positive prices should fail"
+  tokenPairSetRateNonPositiveSellingPriceCid <- submitMustFail admin do
+    exerciseCmd tokenPairSetRateEqualCid SetRate with
+      newSellingPrice = 0.0
+      newBuyingPrice = 104000.0
+
+  debug "Setting non-positive buying price should fail"
+  tokenPairSetRateNonPositiveBuyingPriceCid <- submitMustFail admin do
+    exerciseCmd tokenPairSetRateEqualCid SetRate with
+      newSellingPrice = 104000.0
+      newBuyingPrice = 0.0
+
+  --
+  -- 2. Abnormal cases for TokenPair creation:
+  --
+  -- Using the same token for both input and quote should fail
+  debug "Using the same token for both input and quote should fail"
+  tokenPairSetRateSameTokenCid <- submitMustFail admin do
+    createCmd TokenPairSetup with
+      admin
+      liquidityProvider = lp
+      inputListingKey = (admin, btcMasterKey)
+      quoteListingKey = (admin, btcMasterKey)
+      registryKey = admin
+
+  -- Unauthorized party attempting to create a TokenPair should fail
+  debug "Unauthorized party attempting to create a TokenPair should fail"
+  tokenPairSetRateUnauthorizedPartyCid <- submitMustFail lp do
+    createCmd TokenPairSetup with
+      admin
+      liquidityProvider = lp
+      inputListingKey = (admin, btcMasterKey)
+      quoteListingKey = (admin, usdtMasterKey)
+      registryKey = admin
+
+  -- Fetch the active token pair contract id
+  activeBTCUSDTTokenPairOpt <- queryContractKey @TokenPair admin (admin, btcMasterKey, usdtMasterKey)
+  let activeBTCUSDTTokenPairCid = (fromSome activeBTCUSDTTokenPairOpt)._1
+  debug $ "Active BTC/USDT token pair contract id: " <> show activeBTCUSDTTokenPairCid
+  
+  -- Get the data of the active token pair
+  tokenPairData <- submit admin do exerciseCmd activeBTCUSDTTokenPairCid GetData
+  debug $ "Token pair data: " <> show tokenPairData
+
+  -- 3. Authorization tests for choices:
+  -- Unauthorized party attempting to call SetRate should fail.
+  debug "Unauthorized party attempting to call SetRate should fail"
+  submitMustFail lp do
+    exerciseCmd activeBTCUSDTTokenPairCid SetRate with
+      newSellingPrice = 104000.0
+      newBuyingPrice = 104000.0
+
+  -- Any party other than admin or liquidityProvider calling GetRate should fail, if not intended.
+  debug "Any party other than admin or liquidityProvider calling GetRate should fail, if not intended."
+  debug "Getting rate with admin should succeed"
+  (sellingPrice, buyingPrice) <- submit admin do
+    exerciseCmd activeBTCUSDTTokenPairCid GetRate with requester = admin
+  sellingPrice === 104000.0
+  buyingPrice === 104000.0
+
+  -- debug "Getting rate with liquidityProvider should fail due to missing lookup authorization"
+  -- submitMustFail lp do
+  --   exerciseCmd activeBTCUSDTTokenPairCid GetRate with requester = lp
+
+  debug "Unauthorized party attempting to call GetRate should fail"
+  unauthorizedParty <- allocateParty "UnauthorizedParty"
+  submitMustFail unauthorizedParty do
+    exerciseCmd activeBTCUSDTTokenPairCid GetRate with requester = unauthorizedParty
+
+  -- Unauthorized party attempting to call GetLiquidityProvider should fail
+  debug "Unauthorized party attempting to call GetLiquidityProvider should fail"
+  submitMustFail unauthorizedParty do
+    exerciseCmd activeBTCUSDTTokenPairCid GetLiquidityProvider
+  
+  --
+  -- 4. State validation after complex interactions:
+  -- After multiple SetRate calls, verify the final rates are correct.
+  debug "After multiple SetRate calls, verify the final rates are correct."
+  tokenPairSetRateCid00 <- submit admin do
+    exerciseCmd activeBTCUSDTTokenPairCid SetRate with
+      newSellingPrice = 104000.0
+      newBuyingPrice = 103000.0
+
+  tokenPairSetRateCid01 <- submit admin do
+    exerciseCmd tokenPairSetRateCid00 SetRate with
+      newSellingPrice = 104000.0
+      newBuyingPrice = 103500.0
+
+  tokenPairSetRateCid02 <- submit admin do
+    exerciseCmd tokenPairSetRateCid01 SetRate with
+      newSellingPrice = 105000.0
+      newBuyingPrice = 104000.0
+
+  tokenPairSetRateCid03 <- submit admin do
+    exerciseCmd tokenPairSetRateCid02 SetRate with
+      newSellingPrice = 106000.0
+      newBuyingPrice = 105000.0
+  
+  (newSellingPrice, newBuyingPrice) <- submit admin do
+    exerciseCmd tokenPairSetRateCid03 GetRate with requester = admin
+  newSellingPrice === 106000.0
+  newBuyingPrice === 105000.0
+
+  -- Test: Register a new party and verify they can see existing contracts
+  debug "=== Testing Observer Updates for New Parties ==="
+  
+  -- Register a new party after contracts are already created
+  [newUser] <- registerPartiesAndUpdateContracts admin ["Duck"]
+
+  -- Get the active token pair contract id
+  activeBTCUSDTTokenPairOpt <- queryContractKey @TokenPair admin (admin, btcMasterKey, usdtMasterKey)
+  let activeBTCUSDTTokenPairCid = (fromSome activeBTCUSDTTokenPairOpt)._1
+  debug $ "Active BTC/USDT token pair contract id: " <> show activeBTCUSDTTokenPairCid
+  
+  -- Verify the new party can now query the rate (they can see the contract)
+  (newUserSellingPrice, newUserBuyingPrice) <- submit newUser do
+    exerciseCmd activeBTCUSDTTokenPairCid GetRate with requester = newUser
+  
+  newUserSellingPrice === 106000.0
+  newUserBuyingPrice === 105000.0
+  
+  debug "✅ New party can successfully query rates after observer update"
+  
+  -- dick <-allocateAndRegisterParties admin ["Dick"]
+  
+  return ()
+
+tokenListingUnlistTest: Script ()
+tokenListingUnlistTest = script do
+  -- Registry setup & party registration
+  registryCid <- initializeRegistry
+  adminOpt <- getAdminParty
+  let admin = fromSome adminOpt
+  [lp, btcOwner, usdtOwner] <- allocateAndRegisterParties admin ["LiquidityProvider", "BtcOwner", "UsdtOwner"]
+
+  -- Token setup
+  btcMetadata <- createMetadata "Bitcoin" "BTC" "Decentralized digital currency" 8
+  usdtMetadata <- createMetadata "Tether" "USDT" "Stablecoin pegged to USD" 6
+
+  -- Initializing BTC and USDT tokens
+  (btcMasterCid, btcLedgerCid) <- createToken 
+    btcOwner btcMetadata 100.0 admin
+
+  (usdtMasterCid, usdtLedgerCid) <- createToken 
+    usdtOwner usdtMetadata 1000000.0 admin
+
+  -- Create token listings
+  let
+    btcMasterKey = (btcOwner, btcMetadata.symbol)
+    usdtMasterKey = (usdtOwner, usdtMetadata.symbol)
+
+  -- create token listing
+  (btcListingCid, btcListingKey) <- createTokenListing btcOwner admin btcMetadata.symbol admin
+
+  (usdtListingCid, usdtListingKey) <- createTokenListing usdtOwner admin usdtMetadata.symbol admin
+
+  -- Create token pair using listings
+  tokenPairSetupCid <- createTokenPairSetup admin lp btcMasterKey usdtMasterKey admin
+
+  debug "Creating a token pair using listings"
+
+  -- Create a token pair using listings
+  tokenPairCid <- createTokenPairWithSetup admin tokenPairSetupCid 103500.0 103000.0 admin
+
+  -- Mint and burn tokens
+  (newBtcMasterCid, newBtcLedgerCid) <- submit btcOwner do
+    exerciseCmd btcMasterCid Mint with amount = 10.0  
+
+  -- Burn some of the newly minted tokens
+  (finalBtcMasterCid, _) <- submit btcOwner do
+    exerciseCmd newBtcMasterCid Burn with tokenCid = newBtcLedgerCid, amountToBurn = Some 5.0
+
+  -- Create a UnlistingRequest should succeed
+  debug "Creating a UnlistingRequest should succeed"
+  btcUnlistingRequestCid <- submit btcOwner do
+    exerciseCmd btcListingCid RequestUnlisting
+
+  debug "Creating the same UnlistingRequest should fail"
+  submitMustFail btcOwner do
+    exerciseCmd btcListingCid RequestUnlisting
+
+  -- When the unlisting request is not approved, the token pair should still be active.
+  debug "When the unlisting request is not approved, the token pair should still be active."
+  tokenPairData <- submit admin do exerciseCmd tokenPairCid GetData
+  tokenPairData.baseTokenKey === btcMasterKey
+  tokenPairData.quoteTokenKey === usdtMasterKey
+
+  -- The admin should still be able to set the rate on the token pair.
+  debug "The admin should still be able to set the rate on the token pair."
+  tokenPairSetRateCid <- submit admin do
+    exerciseCmd tokenPairCid SetRate with
+      newSellingPrice = 104000.0
+      newBuyingPrice = 103000.0
+
+  -- The admin should be able to approve the unlisting request.
+  debug "The admin should be able to approve the unlisting request."
+  submit admin do
+    exerciseCmd btcUnlistingRequestCid ApproveUnlisting
+
+  -- The admin should not be able to update token pair rate after the unlisting request is approved.
+  debug "The admin should not be able to update token pair rate after the unlisting request is approved."
+  submitMustFail admin do
+    exerciseCmd tokenPairSetRateCid SetRate with
+      newSellingPrice = 104000.0
+      newBuyingPrice = 103000.0
+
+  debug "Successfully verified that a TokenPair is inoperable once a listing is unlisted."
+  
+  return ()

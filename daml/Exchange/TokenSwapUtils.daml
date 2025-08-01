@@ -1,0 +1,28 @@
+module Exchange.TokenSwapUtils where
+
+import Exchange.TokenPair
+
+-- Utility functions for swap calculations
+calculateSellingAmount : Decimal -> Decimal -> Decimal
+calculateSellingAmount amount sellingPrice = amount / sellingPrice
+
+calculateBuyingAmount : Decimal -> Decimal -> Decimal  
+calculateBuyingAmount amount buyingPrice = amount * buyingPrice
+
+-- Calculate the expected output amount
+calculateExpectedOutputAmount: Text -> TokenPair -> Decimal -> Decimal
+calculateExpectedOutputAmount symbol tokenPair inputAmount = do
+  if symbol == (snd tokenPair.baseTokenKey)
+    then calculateBuyingAmount inputAmount tokenPair.buyingPrice
+    else calculateSellingAmount inputAmount tokenPair.sellingPrice
+
+-- Swap validation helper
+validateSwapAmounts : Decimal -> Decimal -> Decimal -> Decimal -> Bool
+validateSwapAmounts inputAmount outputAmount sellingPrice buyingPrice =
+  let calculatedOutput = calculateSellingAmount inputAmount sellingPrice
+      calculatedInput = calculateBuyingAmount outputAmount buyingPrice
+  in calculatedOutput >= outputAmount && calculatedInput <= inputAmount
+
+-- Range validation
+rangeValidation: Decimal -> Decimal -> Decimal -> Bool
+rangeValidation lowerBound upperBound value = lowerBound <= value && value <= upperBound

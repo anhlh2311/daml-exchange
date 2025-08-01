@@ -1,0 +1,21 @@
+.status-label {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-label.completed {
+  background-color: #d1fae5;
+  color: #047857;
+}
+
+.status-label.rejected {
+  background-color: #fecaca;
+  color: #b91c1c;
+}
+
+.status-label.cancelled {
+  background-color: #e5e7eb;
+  color: #374151;
+}

@@ -1,63 +1,115 @@
 module Main where
 
 import Daml.Script
-
--- import Currency.TokenLedger
--- import Currency.TokenMetadata
--- import Currency.PartyRegistry
+import DA.Optional (fromSome)
+import Currency.TokenLedger
+import Currency.TokenMetadata
+import Exchange.TokenListing
+import Scripts.PartyManagement
+import Scripts.PartyUtils
+import Scripts.SetupUtils
 
 setup: Script ()
 setup = do
-    -- allocate parties--
-    -- usdtOwner <- allocatePartyWithHint "USDT Owner" (PartyIdHint "USDTOwner")
-    -- usdcOwner <- allocatePartyWithHint "USDC Owner" (PartyIdHint "USDCOwner")
-    -- admin <- allocatePartyWithHint "Admin" (PartyIdHint "Admin")
-    -- owner <- allocatePartyWithHint "TokenOwner" (PartyIdHint "Owner")
-    -- alice <- allocatePartyWithHint "Holder" (PartyIdHint "Alice")
-    -- bob <- allocatePartyWithHint "Holder" (PartyIdHint "Bob")
-    -- charlie <- allocatePartyWithHint "Holder" (PartyIdHint "Charlie")
+    -- initialize party registry
+    registryCid <- initializeRegistry
+    adminOpt <- getAdminParty
+    let admin = fromSome adminOpt
 
-    -- construct user ids from text strings
-    -- adminId <- validateUserId "Admin"
-    -- ownerId <- validateUserId "Owner"
-    -- usdcOwnerId <- validateUserId "Owner"
-    -- aliceId <- validateUserId "Alice"
-    -- bobId <- validateUserId "Bob"
-    -- charlieId <- validateUserId "Charlie"
+    -- allocate parties
+    usdcOwner <- allocateAndRegisterParty admin "USDCOwner"
+    btcOwner <- allocateAndRegisterParty admin "BTCOwner"
+    liquidityProvider <- allocateAndRegisterParty admin "LiquidityProvider"
+    alice <- allocateAndRegisterParty admin "Alice"
+    bob <- allocateAndRegisterParty admin "Bob"
+    charlie <- allocateAndRegisterParty admin "Charlie"
 
     -- create token metadata
     -- usdtMetadata <- createMetadata "Tether USD" "USDT"
-    -- usdcMetadata <- createMetadata "USD Coin" "USDC"
-
-    -- create user with given rights
-    -- createUser (User adminId (Some admin)) [CanActAs admin]
-    -- createUser (User ownerId (Some owner)) [CanActAs owner]
-    -- createUser (User usdcOwnerId (Some owner)) [CanActAs owner]
-    -- createUser (User aliceId (Some alice)) [CanActAs alice]
-    -- createUser (User bobId (Some bob)) [CanActAs bob]
-    -- createUser (User charlieId (Some charlie)) [CanActAs charlie]
-
-    -- -- Create party registry
-    -- registryCid <- submit admin do
-    --     createCmd PartyRegistry with
-    --         admin = admin
-    --         registeredParties = [admin, owner, alice, bob, charlie]
+    usdcMetadata <- createMetadata "USD Coin" "USDC" "USD COIN" 6
+    btcMetadata <- createMetadata "Bitcoin" "BTC" "Decentralized digital currency" 8
 
     -- -- create token setup
-    -- setupUSDTCid <- submit owner do
-    --     createCmd TokenSetup with
-    --         owner = owner
-    --         initialSupply = 0.0
-    --         metadata = usdtMetadata
-    --         registry = registryCid
+    setupUSDCid <- submit usdcOwner do
+        createCmd TokenSetup with
+            owner = usdcOwner
+            initialSupply = 1000000.00
+            metadata = usdcMetadata
+            registryKey = admin
 
-    -- -- setupUSDCid <- submit owner do
-    -- --     createCmd TokenSetup with
-    -- --         owner = owner
-    -- --         initialSupply = 0.0
-    -- --         metadata = usdcMetadata
-    -- --         observers = [alice, bob, charlie]
+    (usdcMasterCid, usdcTokenLedgerCid) <- submit usdcOwner do
+        exerciseCmd setupUSDCid Initialize
 
-    -- (usdtMasterCid, usdtTokenLedgerCid) <- submit owner do
-    --     exerciseCmd setupUSDTCid Initialize
+    setupBTCid <- submit btcOwner do
+        createCmd TokenSetup with
+            owner = btcOwner
+            initialSupply = 100000.00
+            metadata = btcMetadata
+            registryKey = admin
+
+    (btcMasterCid, btcTokenLedgerCid) <- submit btcOwner do
+        exerciseCmd setupBTCid Initialize
+
+    -- USDC Owner deposit 200000 USDC to Alice
+    (usdcTokenTransferLockToAliceCid, usdcTokenLedger2Opt) <- submit usdcOwner do
+        exerciseCmd usdcTokenLedgerCid LockTokenForTransfer with
+            recipient = alice
+            transferAmount = 200000.00
+    let usdcTokenLedger2Cid = fromSome usdcTokenLedger2Opt
+
+    -- USDC Owner deposit 500000 USDC to LiquidityProvider
+    (usdcTokenTransferLockToLiquidityProviderCid, usdcTokenLedger3Opt) <- submit usdcOwner do
+        exerciseCmd usdcTokenLedger2Cid LockTokenForTransfer with
+            recipient = liquidityProvider
+            transferAmount = 500000.00
+    let usdcTokenLedger3Cid = fromSome usdcTokenLedger3Opt
+
+    -- BTC Owner deposit 1000 BTC to LiquidityProvider
+    (btcTokenTransferLockToLiquidityProviderCid, btcTokenLedger2Opt) <- submit btcOwner do
+        exerciseCmd btcTokenLedgerCid LockTokenForTransfer with
+            recipient = liquidityProvider
+            transferAmount = 1000.00
+    let btcTokenLedger2Cid = fromSome btcTokenLedger2Opt
+
+    -- Alice accept USDC deposit
+    submit alice do
+        exerciseCmd usdcTokenTransferLockToAliceCid Accept
+
+    -- LiquidityProvider accept USDC deposit
+    submit liquidityProvider do
+        exerciseCmd usdcTokenTransferLockToLiquidityProviderCid Accept
+
+    -- LiquidityProvider accept BTC deposit
+    submit liquidityProvider do
+        exerciseCmd btcTokenTransferLockToLiquidityProviderCid Accept
+
+    -- create USDC TokenListing 
+    usdcTokenListingRequestCid <- submit usdcOwner do
+        createCmd ListingRequest with
+            tokenOwner = usdcOwner
+            admin = admin
+            tokenMasterKey = (usdcOwner, "USDC")
+            registryKey = admin
+
+    usdcTokenListingCid <- submit admin do
+        exerciseCmd usdcTokenListingRequestCid ApproveListing
+
+    -- create BTC TokenListing 
+    btcTokenListingRequestCid <- submit btcOwner do
+        createCmd ListingRequest with
+            tokenOwner = btcOwner
+            admin = admin
+            tokenMasterKey = (btcOwner, "BTC")
+            registryKey = admin
+
+    btcTokenListingCid <- submit admin do
+        exerciseCmd btcTokenListingRequestCid ApproveListing
+
+    -- Create USDC-BTC TokenPair using listings
+    btcUsdcTokenPairSetupCid <- createTokenPairSetup admin liquidityProvider (btcOwner, "BTC") (usdcOwner, "USDC") admin
+    
+    debug $ "BTC USDC Token Pair Setup CID: " <> show btcUsdcTokenPairSetupCid
+
+    btcUsdcTokenPairCid <- createTokenPairWithSetup admin btcUsdcTokenPairSetupCid 108608.00 108589.00 admin
+
     return ()
