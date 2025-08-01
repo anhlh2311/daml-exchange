@@ -1,11 +1,12 @@
 import { SwapRequest } from "@daml.js/exchange-0.0.1/lib/Exchange/TokenSwap";
-import { useLedger, useQuery } from "@daml/react";
+import { useLedger, useQuery, useReload } from "@daml/react";
+import { ContractId } from "@daml/types";
+import { useState } from "react";
 
 export const useSwapRequestAction = () => {
   const { contracts, loading } = useQuery(SwapRequest);
-  console.log({ contracts });
 
-  // const ledger = useLedger();
+  const ledger = useLedger();
 
   // const acceptSwap = async (
   //   contractId: string,
@@ -16,9 +17,9 @@ export const useSwapRequestAction = () => {
   //   });
   // };
 
-  // const finalizeSwap = async (contractId: string) => {
-  //   return ledger.exercise(SwapRequest.FinalizeSwap, contractId, {});
-  // };
+  const finalizeSwap = async (contractId: ContractId<SwapRequest>) => {
+    return ledger.exercise(SwapRequest.FinalizeSwap, contractId, {});
+  };
 
   // const cancelSwapRequest = async (contractId: string) => {
   //   return ledger.exercise(SwapRequest.CancelSwapRequest, contractId, {});
@@ -34,5 +35,7 @@ export const useSwapRequestAction = () => {
     // cancelSwapRequest,
     // rejectSwapRequest,
     contracts,
+    finalizeSwap,
+    loading,
   };
 };

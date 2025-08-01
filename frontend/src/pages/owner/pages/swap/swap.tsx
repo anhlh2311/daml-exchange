@@ -7,54 +7,107 @@ import { SlippageTolerance } from "pages/owner/component/slippage-tolerance/slip
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "./swap.css";
-import { getBalanceToken } from "utils/helper";
+import {
+  buildTokenPairKey,
+  calculateReceiveAmount,
+  getBalanceToken,
+} from "utils/helper";
 import { useLedgerParty } from "context/ledger-context";
+import { useToast } from "context/toastStore";
+import SwapSubmitted from "pages/owner/component/swap-submitted/swap-submitted";
 
 const Swap = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { loading, rate, rateLoading, tokens, tokenPairs } = useTokenPair();
-  const { createSwapRequest, createSwapRequestSetup } = useSwapRequest();
-  const defaultToken = location.state?.defaultToken;
-  const { selectedParty } = useLedgerParty();
+  const toast = useToast();
 
-  const [fromToken, setFromToken] = useState<string>("");
-  const [toToken, setToToken] = useState<string>("");
-  const [amount, setAmount] = useState<string>("");
-  const [receiveAmount, setReceiveAmount] = useState("");
-  const [slippage, setSlippage] = useState(1.2);
+  const { loading, rate, rateLoading, tokens, tokenPairs, loadingTokenLedger } =
+    useTokenPair();
+  const { createSwapRequest, createSwapRequestSetup } = useSwapRequest();
+  const { selectedParty, isLoading, setIsLoading } = useLedgerParty();
+
+  const defaultToken = location.state?.defaultToken;
+
+  const [form, setForm] = useState({
+    fromToken: "",
+    toToken: "",
+    amount: "",
+    receiveAmount: "",
+    slippage: 1.2,
+  });
+
+  const [submittedData, setSubmittedData] = useState<null | {
+    fromToken: string;
+    toToken: string;
+    amount: string;
+    receiveAmount: string;
+  }>(null);
+
+  useEffect(() => {
+    if (defaultToken) {
+      setForm((prev) => ({ ...prev, fromToken: defaultToken.symbol }));
+    }
+  }, [defaultToken]);
+
+  useEffect(() => {
+    setForm((prev) => ({
+      ...prev,
+      receiveAmount: calculateReceiveAmount(
+        rate,
+        prev.fromToken,
+        prev.toToken,
+        prev.amount
+      ),
+    }));
+  }, [form.fromToken, form.toToken, form.amount, rate]);
+
+  const resetForm = () => {
+    setForm({
+      fromToken: "",
+      toToken: "",
+      amount: "",
+      receiveAmount: "",
+      slippage: 1.2,
+    });
+  };
 
   const handleSwap = async () => {
+    const { fromToken, toToken, amount, receiveAmount, slippage } = form;
+
     if (!fromToken || !toToken || !amount) {
-      alert("Please fill all fields.");
+      toast.displayError("Please fill all fields");
       return;
     }
 
     if (!rate || !tokenPairs || tokenPairs.length === 0) {
-      alert("Token pair not found.");
+      toast.displayError("Token pair not found.");
       return;
     }
 
     try {
+      setIsLoading(true);
+
       const tokenPair = tokenPairs[0];
-      const tokenPairKey = {
-        _1: tokenPair.payload.admin,
-        _2: tokenPair.payload.baseTokenKey,
-        _3: tokenPair.payload.quoteTokenKey,
+      const tokenPairKey = buildTokenPairKey(tokenPair);
+
+      const inputTokenLedgerKey = {
+        _1:
+          fromToken === "BTC"
+            ? tokenPair.payload.baseTokenKey._1
+            : tokenPair.payload.quoteTokenKey._1,
+        _2: selectedParty?.identifier ?? "",
+        _3:
+          fromToken === "BTC"
+            ? tokenPair.payload.baseTokenKey._2
+            : tokenPair.payload.quoteTokenKey._2,
       };
 
       const params = {
         swapper: selectedParty?.identifier ?? "",
         admin: tokenPair.payload.admin,
         liquidityProvider: tokenPair.payload.liquidityProvider,
-        inputTokenLedgerKey: {
-          _1:
-            fromToken === "BTC"
-              ? tokenPair.payload.baseTokenKey._1
-              : tokenPair.payload.quoteTokenKey._1,
-          _2: selectedParty?.identifier ?? "",
-        },
-        tokenPairKey: tokenPairKey,
+        inputTokenLedgerKey,
+        tokenPairKey,
         inputAmount: amount,
         expectedOutputAmount: receiveAmount,
         slippageTolerance: String(slippage / 100),
@@ -62,48 +115,31 @@ const Swap = () => {
       };
 
       const res = await createSwapRequestSetup(params);
-      const setupContractId = res.contractId;
+      await createSwapRequest(res.contractId);
 
-      const swapResult = await createSwapRequest(setupContractId);
-
-      alert("Swap completed successfully!");
-      navigate("/");
+      toast.displaySuccess("Swap completed successfully!");
+      setSubmittedData({
+        fromToken: form.fromToken,
+        toToken: form.toToken,
+        amount: form.amount,
+        receiveAmount: form.receiveAmount,
+      });
+      resetForm();
+      setTimeout(() => setIsLoading(false), 1000);
     } catch (err) {
       console.error(err);
-      alert("Swap failed");
+      toast.displayError("Swap failed");
+      setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (defaultToken) {
-      setFromToken(defaultToken.symbol);
-    }
-  }, [defaultToken]);
-
-  useEffect(() => {
-    if (!rate || !fromToken || !toToken || !amount) {
-      setReceiveAmount("");
-      return;
-    }
-
-    const amountNumber = parseFloat(amount);
-    const sellingPrice = parseFloat(rate.sellingPrice);
-    const buyingPrice = parseFloat(rate.buyingPrice);
-
-    let result = 0;
-
-    if (fromToken === "BTC" && toToken === "USDC") {
-      result = amountNumber * buyingPrice;
-    } else if (fromToken === "USDC" && toToken === "BTC") {
-      result = amountNumber / sellingPrice;
-    } else {
-      result = 0;
-    }
-
-    setReceiveAmount(result.toFixed(6));
-  }, [fromToken, toToken, amount, rate]);
-
-  if (loading || rateLoading) {
+  if (
+    loading ||
+    rateLoading ||
+    isLoading ||
+    loadingTokenLedger ||
+    tokens.length === 0
+  ) {
     return <LoadingScreen />;
   }
 
@@ -114,10 +150,8 @@ const Swap = () => {
         <div className="swap-form">
           <p>You Pay</p>
           <select
-            value={fromToken}
-            onChange={(e) => {
-              setFromToken(e.target.value);
-            }}
+            value={form.fromToken}
+            onChange={(e) => setForm({ ...form, fromToken: e.target.value })}
           >
             <option value="">-- Select Token --</option>
             {tokens.map((token) => (
@@ -130,19 +164,18 @@ const Swap = () => {
           <input
             type="number"
             min="0"
-            value={amount}
-            onChange={(e) => {
-              setAmount(e.target.value);
-            }}
+            value={form.amount}
+            onChange={(e) => setForm({ ...form, amount: e.target.value })}
             placeholder="Enter amount"
           />
-          {fromToken ? (
+
+          {form.fromToken && (
             <div className="balance-box">
               <span className="balance-text">
-                Balance: {getBalanceToken(tokens, fromToken)}
+                Balance: {getBalanceToken(tokens, form.fromToken)}
               </span>
             </div>
-          ) : null}
+          )}
 
           <div
             className="token-card-symbol"
@@ -150,16 +183,15 @@ const Swap = () => {
           >
             <ArrowsUpDownIcon color="#6366f1" />
           </div>
+
           <p>You Receive</p>
           <select
-            value={toToken}
-            onChange={(e) => {
-              setToToken(e.target.value);
-            }}
+            value={form.toToken}
+            onChange={(e) => setForm({ ...form, toToken: e.target.value })}
           >
             <option value="">-- Select Token --</option>
             {tokens
-              .filter((t) => t.symbol !== fromToken)
+              .filter((t) => t.symbol !== form.fromToken)
               .map((token) => (
                 <option key={token.symbol} value={token.symbol}>
                   {token.name} ({token.symbol})
@@ -171,26 +203,41 @@ const Swap = () => {
             type="number"
             min="0"
             readOnly
-            value={receiveAmount}
+            value={form.receiveAmount}
             placeholder="Receive amount"
           />
-          {toToken ? (
+
+          {form.toToken && (
             <div className="balance-box">
               <span className="balance-text">
-                Balance: {getBalanceToken(tokens, toToken)}
+                Balance: {getBalanceToken(tokens, form.toToken)}
               </span>
             </div>
-          ) : null}
+          )}
+
           <SlippageTolerance
-            receiveAmount={receiveAmount}
-            slippage={slippage}
-            setSlippage={setSlippage}
+            receiveAmount={form.receiveAmount}
+            slippage={form.slippage}
+            setSlippage={(val) => setForm({ ...form, slippage: val })}
           />
 
           <button className="swap-button2" onClick={handleSwap}>
             Swap
           </button>
         </div>
+
+        {submittedData && submittedData.fromToken !== "" && (
+          <SwapSubmitted
+            inputAmount={submittedData.amount}
+            inputToken={submittedData.fromToken}
+            outputAmount={submittedData.receiveAmount}
+            outputToken={submittedData.toToken}
+            onGoDashboard={() => {
+              setSubmittedData(null);
+              navigate("/");
+            }}
+          />
+        )}
       </div>
     </MainLayout>
   );

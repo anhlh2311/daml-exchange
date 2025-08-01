@@ -4,7 +4,7 @@ import "./slippage-tolerance.css";
 interface IProps {
   receiveAmount: string;
   slippage: number;
-  setSlippage: React.Dispatch<React.SetStateAction<number>>;
+  setSlippage: (val: number) => void;
 }
 export const SlippageTolerance = (props: IProps) => {
   const { receiveAmount, setSlippage, slippage } = props;
@@ -52,7 +52,7 @@ export const SlippageTolerance = (props: IProps) => {
         {Number(receiveAmount) ? (
           <p className="exchange-rate">
             <strong>
-              1 BTC = 108589 USDC (Minimum:
+              1 BTC = 108589 USDC (Minimum receive:
               {parseFloat(receiveAmount) * (1 - slippage / 100)})
             </strong>
           </p>

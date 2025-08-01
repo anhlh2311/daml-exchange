@@ -9,7 +9,6 @@ export function useLedgerQuery(template: any, contractId: any) {
     const fetch = async () => {
       try {
         const result = await ledger.fetch(template, contractId);
-        console.log({ result });
 
         setContract(result);
       } catch (err) {

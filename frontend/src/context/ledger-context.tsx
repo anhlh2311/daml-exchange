@@ -12,6 +12,8 @@ interface LedgerContextType {
   setRole: (role: Role) => void;
   listParties: Party[];
   setListParties: (party: Party[] | []) => void;
+  isLoading: boolean;
+  setIsLoading: (isLoading: boolean) => void;
 }
 
 interface Props {
@@ -32,6 +34,7 @@ export const LedgerProvider: React.FC<Props> = ({ children }) => {
   const [selectedParty, setSelectedParty] = useState<Party | null>(null);
   const [role, setRole] = useState<Role>(null);
   const [listParties, setListParties] = useState<Party[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   const token = (authConfig as Insecure).makeToken(
     selectedParty?.displayName ?? "Admin"
@@ -46,6 +49,8 @@ export const LedgerProvider: React.FC<Props> = ({ children }) => {
         setRole,
         listParties,
         setListParties,
+        isLoading,
+        setIsLoading,
       }}
     >
       {selectedParty ? (

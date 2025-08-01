@@ -1,28 +1,30 @@
-import BoxSystemOverView from "components/box-overview/box-system-overview";
 import MainLayout from "components/layout/main-layout";
-import RecentActivity from "components/recent-activity/recent-activity";
 import { useAuthStore } from "stores/authStore";
-import { metrics, metricsProvider } from "utils/dataMock";
+import { TokenPortfolio } from "./component/porfolio/pofolio";
 import QuickAction from "./component/quick-action/quick-action";
-import "./index.css";
 import SwapRequest from "./component/swap-request/swap-request";
-import { useSwapRequestAction } from "hooks/useSwapRequestAction";
+import "./index.css";
+import LoadingScreen from "components/loading/loading";
+import { useLedgerParty } from "context/ledger-context";
 
 const Owner = () => {
   const { role } = useAuthStore();
+  const { isLoading } = useLedgerParty();
   const isProvider = role === "liquidity";
-  const { contracts } = useSwapRequestAction();
-  console.log({ contracts });
 
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
   return (
     <MainLayout>
       <div className="dashboard-container">
         <div className="overview-container-owner">
           <div className={`overview-left ${isProvider ? "provider-full" : ""}`}>
-            <BoxSystemOverView
+            {/* <BoxSystemOverView
               data={isProvider ? metricsProvider : metrics}
               title={isProvider ? "Swap Response Overview" : "Token Management"}
-            />
+            /> */}
+            <TokenPortfolio />
           </div>
           <div className={`overview-right ${isProvider ? "hidden" : ""}`}>
             <QuickAction />
@@ -38,7 +40,7 @@ const Owner = () => {
         {/* </>
         )} */}
         <SwapRequest />
-        <RecentActivity />
+        {/* <RecentActivity /> */}
 
         {/* <div className="activity-grid">
           <div className="activity-main">

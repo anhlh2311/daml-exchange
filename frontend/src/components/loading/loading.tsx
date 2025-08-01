@@ -4,7 +4,7 @@ import "./loading.css"; // import file CSS riêng
 const LoadingScreen = () => {
   return (
     <div className="loading-container">
-      <ArrowPathIcon className="loading-icon " />
+      <ArrowPathIcon color="#4f46e5" className="loading-icon " />
     </div>
   );
 };

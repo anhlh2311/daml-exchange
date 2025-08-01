@@ -8,7 +8,7 @@ export const useSwapRequest = () => {
     swapper: string;
     admin: string;
     liquidityProvider: string;
-    inputTokenLedgerKey: { _1: string; _2: string };
+    inputTokenLedgerKey: { _1: string; _2: string; _3: string };
     tokenPairKey: {
       _1: string;
       _2: { _1: string; _2: string };

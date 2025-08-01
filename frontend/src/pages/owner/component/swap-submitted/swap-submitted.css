@@ -1,0 +1,29 @@
+.swap-submitted-container {
+  background-color: #d9f2de;
+  color: #064420;
+  padding: 20px;
+  border-radius: 16px;
+  margin: 20px auto;
+}
+
+.swap-message {
+  font-size: 1.2rem;
+  margin-bottom: 20px;
+  font-weight: 500;
+}
+
+.dashboard-button {
+  background: #6366f1;
+  color: #fff;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+}
+
+.dashboard-button:hover {
+  opacity: 0.9;
+}

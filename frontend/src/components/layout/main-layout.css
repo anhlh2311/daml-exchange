@@ -7,15 +7,10 @@
 
 .main-content {
   flex: 1;
-  max-width: 1280px;
   margin: 0 auto;
   padding: 1.5rem 1rem;
-}
-
-@media (min-width: 640px) {
-  .main-content {
-    padding: 1.5rem 1.5rem;
-  }
+  width: 100%;
+  max-width: 1280px;
 }
 
 @media (min-width: 1024px) {

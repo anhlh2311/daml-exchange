@@ -1,7 +1,7 @@
 import { TokenPair } from "@daml.js/exchange-0.0.1/lib/Exchange/TokenPair";
 import { useLedger, useQuery } from "@daml/react";
 import { useLedgerParty } from "context/ledger-context";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { TokenLedger } from "@daml.js/exchange-0.0.1/lib/Currency/TokenLedger";
 import { getBalanceToken } from "utils/helper";
 
@@ -10,53 +10,38 @@ export interface ListTokenProps {
   name: string;
   balance: string;
 }
+
+export interface RateType {
+  sellingPrice: string;
+  buyingPrice: string;
+}
 export const useTokenPair = () => {
   const ledger = useLedger();
   const { contracts, loading } = useQuery(TokenPair);
+  const { selectedParty } = useLedgerParty();
   const { contracts: tokenLedgers, loading: loadingTokenLedger } = useQuery(
     TokenLedger,
     () => ({ holder: selectedParty?.identifier }),
     []
   );
-  const tokens: ListTokenProps[] = tokenLedgers.map((item) => {
-    return {
-      symbol: item.payload.symbol,
-      name: item.payload.metadata.name,
-      balance: item.payload.amount,
-    };
-  });
-  /*
-      const { contracts: tokenLedgers, loading: loadingTokenLedger } = useQuery(
-    TokenLedger,
-    () => ({ holder: selectedParty?.identifier }),
-    []
-  );
-  const { selectedParty } = useLedgerParty();
-  const [listTokenPairs, setListTokenPairs] = useState<ListTokenProps[]>([]);
-  const [rate, setRate] = useState<{
-    sellingPrice: string;
-    buyingPrice: string;
-  } | null>(null);
-  const [rateLoading, setRateLoading] = useState(false);
-  const tokens: ListTokenProps[] = tokenLedgers.map((item) => {
-    return {
-      symbol: item.payload.symbol,
-      name: item.payload.metadata.name,
-      balance: item.payload.amount,
-    };
-  });
-    */
-  const { selectedParty } = useLedgerParty();
   const [listTokens, setListTokens] = useState<ListTokenProps[]>([]);
-  const [rate, setRate] = useState<{
-    sellingPrice: string;
-    buyingPrice: string;
-  } | null>(null);
+  const [rate, setRate] = useState<RateType | null>(null);
   const [rateLoading, setRateLoading] = useState(false);
+
+  const tokens: ListTokenProps[] = useMemo(() => {
+    const listToken = tokenLedgers.map((item) => {
+      return {
+        symbol: item.payload.symbol,
+        name: item.payload.metadata.name,
+        balance: item.payload.amount,
+      };
+    });
+    return listToken;
+  }, [tokenLedgers.length]);
 
   useEffect(() => {
     const fetchRate = async () => {
-      if (!contracts || contracts.length === 0) return;
+      if (!contracts || contracts.length === 0 || tokens.length === 0) return;
       const listToken: ListTokenProps[] = [
         {
           symbol: contracts[0].key._2._2,
@@ -69,7 +54,6 @@ export const useTokenPair = () => {
           balance: getBalanceToken(tokens, contracts[0].key._3._2),
         },
       ];
-      console.log({ listToken });
 
       setListTokens(listToken);
       setRateLoading(true);
@@ -91,12 +75,13 @@ export const useTokenPair = () => {
     };
 
     fetchRate();
-  }, [contracts, ledger]);
+  }, [contracts, ledger, tokens]);
 
   return {
     tokenPairs: contracts,
     rate,
     rateLoading,
+    loadingTokenLedger,
     loading,
     tokens: listTokens,
   };

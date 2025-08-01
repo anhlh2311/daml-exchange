@@ -1,0 +1,87 @@
+.portfolio-container {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  max-width: 800px;
+  margin: auto;
+}
+
+.portfolio-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.portfolio-summary p {
+  margin: 0;
+  color: #777;
+}
+
+.portfolio-summary h2 {
+  margin: 5px 0 0 0;
+  color: #4f6df5;
+}
+
+.portfolio-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.portfolio-table th {
+  text-align: left;
+  padding: 12px;
+  background: #f8f8f8;
+  color: #4f6df5;
+}
+
+.portfolio-table td {
+  padding: 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.token-cell {
+  display: flex;
+  align-items: center;
+}
+
+.token-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #9d89f5;
+  margin-right: 8px;
+}
+
+/* Optional: Different icons by symbol (placeholder style) */
+.token-icon.btc {
+  background: #f2a900;
+}
+.token-icon.eth {
+  background: #627eea;
+}
+.token-icon.usdt {
+  background: #26a17b;
+}
+.token-icon.sol {
+  background: #9945ff;
+}
+.token-icon.bnb {
+  background: #f3ba2f;
+}
+
+.change-positive {
+  color: green;
+  font-weight: bold;
+}
+
+.change-negative {
+  color: red;
+  font-weight: bold;
+}
+
+.change-neutral {
+  color: gray;
+  font-weight: bold;
+}

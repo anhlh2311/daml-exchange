@@ -2,7 +2,7 @@ import jwtEncode from "jwt-encode";
 import { isRunningOnHub } from "@daml/hub-react";
 import Ledger, { CanReadAs } from "@daml/ledger";
 import { Role } from "stores/authStore";
-import { ListTokenProps } from "hooks/useGetTokenPair";
+import { ListTokenProps, RateType } from "hooks/useGetTokenPair";
 export const createToken = (party: string): string => {
   const payload = {
     "https://daml.com/ledger-api": {
@@ -108,3 +108,29 @@ export const getBalanceToken = (
   }
   return balanceToken;
 };
+
+export const calculateReceiveAmount = (
+  rate: RateType | null,
+  from: string,
+  to: string,
+  amount: string
+) => {
+  if (!rate || !from || !to || !amount) return "";
+
+  const amountNumber = parseFloat(amount);
+  const sellingPrice = parseFloat(rate.sellingPrice);
+  const buyingPrice = parseFloat(rate.buyingPrice);
+
+  if (from === "BTC" && to === "USDC")
+    return (amountNumber * buyingPrice).toFixed(6);
+  if (from === "USDC" && to === "BTC")
+    return (amountNumber / sellingPrice).toFixed(6);
+
+  return "0.000000";
+};
+
+export const buildTokenPairKey = (pair: any) => ({
+  _1: pair.payload.admin,
+  _2: pair.payload.baseTokenKey,
+  _3: pair.payload.quoteTokenKey,
+});

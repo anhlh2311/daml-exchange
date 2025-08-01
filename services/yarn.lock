@@ -312,8 +312,8 @@
 "@daml.js/exchange-0.0.1@file:../daml.js/exchange-0.0.1":
   version "2.10.1"
   dependencies:
-    "@daml.js/40f452260bef3f29dede136108fc08a88d5a5250310281067087da6f0baddff7" "file:../../../../../Users/athurroy/Library/Caches/Yarn/v6/npm-@daml-js-exchange-0-0-1-2.10.1-a3b1c929-009e-4cfb-a312-9f5f1782f82e-1752747305505/node_modules/@daml.js/40f452260bef3f29dede136108fc08a88d5a5250310281067087da6f0baddff7"
-    "@daml.js/d14e08374fc7197d6a0de468c968ae8ba3aadbf9315476fd39071831f5923662" "file:../../../../../Users/athurroy/Library/Caches/Yarn/v6/npm-@daml-js-exchange-0-0-1-2.10.1-a3b1c929-009e-4cfb-a312-9f5f1782f82e-1752747305505/node_modules/@daml.js/d14e08374fc7197d6a0de468c968ae8ba3aadbf9315476fd39071831f5923662"
+    "@daml.js/40f452260bef3f29dede136108fc08a88d5a5250310281067087da6f0baddff7" "file:../../../../../Users/athurroy/Library/Caches/Yarn/v6/npm-@daml-js-exchange-0-0-1-2.10.1-2a5df324-a348-4be5-9033-188f2f7b5530-1752749184674/node_modules/@daml.js/40f452260bef3f29dede136108fc08a88d5a5250310281067087da6f0baddff7"
+    "@daml.js/d14e08374fc7197d6a0de468c968ae8ba3aadbf9315476fd39071831f5923662" "file:../../../../../Users/athurroy/Library/Caches/Yarn/v6/npm-@daml-js-exchange-0-0-1-2.10.1-2a5df324-a348-4be5-9033-188f2f7b5530-1752749184674/node_modules/@daml.js/d14e08374fc7197d6a0de468c968ae8ba3aadbf9315476fd39071831f5923662"
     "@mojotech/json-type-validation" "^3.1.0"
 
 "@daml/ledger@^2.10.1":

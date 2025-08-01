@@ -31,11 +31,9 @@
 
 @media (min-width: 768px) {
   .overview-left:not(.provider-full) {
-    width: 33.3333%;
   }
   .overview-right:not(.hidden) {
-    width: 66.6666%;
-    display: inline-block;
+    flex: 1;
   }
 }
 

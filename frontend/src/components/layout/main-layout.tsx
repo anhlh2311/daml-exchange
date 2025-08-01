@@ -1,6 +1,7 @@
 import Header from "components/header/header";
 import { ReactNode } from "react";
 import "./main-layout.css";
+import ToastNotification from "components/toast/toast";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -20,6 +21,7 @@ const MainLayout = (props: MainLayoutProps) => {
           </p>
         </div>
       </footer>
+      <ToastNotification />
     </div>
   );
 };
